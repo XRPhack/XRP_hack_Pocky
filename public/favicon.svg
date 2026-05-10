@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="NomokDon">
+  <rect width="64" height="64" rx="18" fill="#12211f" />
+  <path d="M14 38V18h8l20 27V18h8v28h-8L22 19v19h-8Z" fill="#b7e54d" />
+  <circle cx="47" cy="45" r="5" fill="#0c8b68" />
+</svg>
