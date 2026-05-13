@@ -55,6 +55,7 @@
   --border-width-spinner: 0.125rem;
   --size-page-min: 320px;
   --size-route-card-max: 28rem;
+  --size-launcher-max: 54rem;
   --size-copy-max: 42rem;
   --size-mobile-shell-max: 30rem;
   --size-mobile-nav: 4.75rem;
@@ -63,17 +64,17 @@
   --size-spinner: 2.75rem;
   --size-verify-shell-max: 72rem;
   --size-verify-panel-min: 20rem;
-  --font-size-display: 3.5rem;
-  --font-size-title: 2rem;
-  --font-size-heading: 1.5rem;
+  --font-size-display: 3rem;
+  --font-size-title: 1.75rem;
+  --font-size-heading: 1.375rem;
   --font-size-body: 1rem;
   --font-size-caption: 0.875rem;
   --font-size-micro: 0.75rem;
-  --font-size-fluid-route-title: 12vw;
-  --line-height-tight: 1;
-  --line-height-title: 1.18;
-  --line-height-copy: 1.6;
-  --letter-spacing-display: -0.06em;
+  --font-size-fluid-route-title: 7vw;
+  --line-height-tight: 1.06;
+  --line-height-title: 1.22;
+  --line-height-copy: 1.58;
+  --letter-spacing-display: -0.052em;
   --letter-spacing-title: -0.035em;
   --letter-spacing-body: -0.01em;
   --letter-spacing-micro: 0.14em;
@@ -116,6 +117,12 @@ body {
   padding: var(--space-8) var(--space-4);
 }
 
+.route-shell--launcher {
+  place-items: start center;
+  padding: var(--space-6) var(--space-4) var(--space-10);
+  background: var(--color-neutral-50);
+}
+
 .route-card {
   display: flex;
   flex-direction: column;
@@ -128,8 +135,19 @@ body {
   box-shadow: var(--shadow-card);
 }
 
+.route-card > * {
+  min-width: 0;
+}
+
+.route-card--launcher {
+  width: min(100%, var(--size-launcher-max));
+  gap: var(--space-6);
+  padding: clamp(var(--space-6), 5vw, var(--space-10));
+}
+
 .route-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-4);
@@ -137,6 +155,7 @@ body {
 
 .route-header__group {
   display: grid;
+  min-width: 0;
   gap: var(--space-1);
 }
 
@@ -173,6 +192,81 @@ body {
   gap: var(--space-2);
 }
 
+.route-launcher-copy {
+  margin-top: 0;
+}
+
+.route-launcher-grid {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.route-launcher-link {
+  display: grid;
+  position: relative;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-5);
+  border: var(--border-width-hairline) solid var(--color-neutral-200);
+  border-radius: var(--radius-xl);
+  background: var(--color-neutral-50-alpha-88);
+  color: inherit;
+  text-decoration: none;
+  transition:
+    border-color var(--motion-fast),
+    box-shadow var(--motion-fast),
+    transform var(--motion-fast);
+}
+
+.route-launcher-link:hover,
+.route-launcher-link:focus-visible {
+  border-color: var(--color-primary-200);
+  box-shadow: var(--shadow-focus);
+  outline: none;
+  transform: translateY(calc(var(--space-1) * -1));
+}
+
+.route-launcher-link__header {
+  display: flex;
+  flex-wrap: wrap;
+  grid-column: 1;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.route-launcher-link__title {
+  color: var(--color-neutral-900);
+  font-size: var(--font-size-heading);
+  font-weight: 900;
+  letter-spacing: var(--letter-spacing-title);
+  line-height: var(--line-height-title);
+}
+
+.route-launcher-link__copy,
+.route-launcher-link__meta {
+  grid-column: 1;
+  color: var(--color-neutral-600);
+  font-size: var(--font-size-caption);
+  font-weight: 700;
+  letter-spacing: var(--letter-spacing-body);
+  line-height: var(--line-height-copy);
+}
+
+.route-launcher-link__meta {
+  color: var(--color-primary-700);
+  font-size: var(--font-size-micro);
+  font-weight: 900;
+}
+
+.route-launcher-link__arrow {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  align-self: center;
+  color: var(--color-primary-600);
+  font-size: var(--font-size-heading);
+  font-weight: 900;
+}
+
 .eyebrow {
   margin: 0 0 var(--space-3);
   color: var(--color-primary-600);
@@ -191,7 +285,11 @@ body {
     var(--font-size-display)
   );
   letter-spacing: var(--letter-spacing-display);
-  line-height: var(--line-height-tight);
+  line-height: var(--line-height-title);
+}
+
+.route-title--launcher {
+  max-width: 13em;
 }
 
 .copy {
@@ -216,6 +314,7 @@ body {
   display: inline-flex;
   align-items: center;
   width: fit-content;
+  max-width: 100%;
   min-height: var(--space-6);
   padding: var(--space-1) var(--space-3);
   border: var(--border-width-hairline) solid transparent;
@@ -223,8 +322,11 @@ body {
   font-size: var(--font-size-caption);
   font-weight: 800;
   letter-spacing: var(--letter-spacing-body);
-  line-height: var(--line-height-tight);
-  white-space: nowrap;
+  line-height: var(--line-height-title);
+  overflow-wrap: break-word;
+  text-align: center;
+  white-space: normal;
+  word-break: keep-all;
 }
 
 .ui-badge--primary {
@@ -265,7 +367,7 @@ body {
 
 .ui-card {
   display: grid;
-  gap: var(--space-5);
+  gap: var(--space-6);
   padding: var(--space-6);
   border: var(--border-width-hairline) solid var(--color-neutral-100);
   border-radius: var(--radius-xl);
@@ -306,6 +408,8 @@ body {
   font-weight: 800;
   letter-spacing: var(--letter-spacing-title);
   line-height: var(--line-height-title);
+  overflow-wrap: break-word;
+  word-break: keep-all;
 }
 
 .ui-card__description,
@@ -319,6 +423,8 @@ body {
   font-weight: 500;
   letter-spacing: var(--letter-spacing-body);
   line-height: var(--line-height-copy);
+  overflow-wrap: break-word;
+  word-break: keep-all;
 }
 
 .ui-explorer-link {
@@ -361,13 +467,16 @@ body {
 }
 
 .ui-explorer-link__value {
+  min-width: 0;
   overflow: hidden;
   color: var(--color-primary-700);
   font-size: var(--font-size-caption);
   font-weight: 700;
   line-height: var(--line-height-copy);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  white-space: normal;
+  word-break: normal;
 }
 
 .ui-explorer-link__network {
@@ -411,12 +520,13 @@ body {
 
 .ui-mobile-shell__title-group {
   display: grid;
+  min-width: 0;
   gap: var(--space-2);
 }
 
 .ui-mobile-shell__content {
   flex: 1;
-  padding: var(--space-5) var(--space-4) calc(var(--size-mobile-nav) + var(--space-6));
+  padding: var(--space-6) var(--space-5) calc(var(--size-mobile-nav) + var(--space-8));
 }
 
 .ui-mobile-shell__nav {
@@ -599,7 +709,7 @@ body {
   display: grid;
   min-height: 100svh;
   place-items: center;
-  padding: var(--space-5) var(--space-4);
+  padding: var(--space-6) var(--space-4);
   background:
     radial-gradient(circle at top right, var(--color-primary-100), transparent var(--space-20)),
     radial-gradient(circle at bottom left, var(--color-neutral-0), transparent var(--space-24)),
@@ -628,7 +738,9 @@ body {
   font-size: clamp(var(--font-size-title), var(--font-size-fluid-route-title), var(--font-size-display));
   font-weight: 800;
   letter-spacing: var(--letter-spacing-display);
-  line-height: var(--line-height-tight);
+  line-height: var(--line-height-title);
+  overflow-wrap: break-word;
+  word-break: keep-all;
 }
 
 .tenant-display-copy {
@@ -639,6 +751,8 @@ body {
   font-weight: 600;
   letter-spacing: var(--letter-spacing-body);
   line-height: var(--line-height-copy);
+  overflow-wrap: break-word;
+  word-break: keep-all;
 }
 
 .tenant-login-card,
@@ -1391,7 +1505,7 @@ body {
 
 .verify-page {
   min-height: 100vh;
-  padding: var(--space-6) var(--space-4) var(--space-10);
+  padding: var(--space-8) var(--space-4) var(--space-12);
   background:
     radial-gradient(circle at top left, var(--color-primary-100), transparent var(--space-24)),
     radial-gradient(circle at bottom right, var(--color-success-background), transparent var(--space-24)),
@@ -1421,22 +1535,24 @@ body {
 
 .verify-page__title {
   margin: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   color: var(--color-neutral-900);
   font-size: clamp(var(--font-size-title), var(--font-size-fluid-route-title), var(--font-size-display));
   font-weight: 900;
   letter-spacing: var(--letter-spacing-display);
-  line-height: var(--line-height-tight);
+  line-height: var(--line-height-title);
+  word-break: keep-all;
 }
 
 .verify-page__copy {
   margin: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   color: var(--color-neutral-700);
   font-size: var(--font-size-body);
   font-weight: 600;
   letter-spacing: var(--letter-spacing-body);
   line-height: var(--line-height-copy);
+  word-break: keep-all;
 }
 
 .verify-result-content {
@@ -1465,7 +1581,8 @@ body {
 .verify-badge-item__title,
 .verify-badge-item__summary,
 .verify-badge-item__evidence {
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  word-break: keep-all;
 }
 
 .verify-grade,
@@ -1656,7 +1773,7 @@ body {
   display: grid;
   min-height: 100svh;
   place-items: center;
-  padding: var(--space-5) var(--space-4);
+  padding: var(--space-6) var(--space-4);
   background:
     radial-gradient(circle at top left, var(--color-primary-100), transparent var(--space-24)),
     radial-gradient(circle at bottom right, var(--color-neutral-0), transparent var(--space-20)),
@@ -1684,7 +1801,9 @@ body {
   font-size: clamp(var(--font-size-title), var(--font-size-fluid-route-title), var(--font-size-display));
   font-weight: 900;
   letter-spacing: var(--letter-spacing-display);
-  line-height: var(--line-height-tight);
+  line-height: var(--line-height-title);
+  overflow-wrap: break-word;
+  word-break: keep-all;
 }
 
 .issuer-display-copy,
@@ -1695,6 +1814,8 @@ body {
   font-weight: 700;
   letter-spacing: var(--letter-spacing-body);
   line-height: var(--line-height-copy);
+  overflow-wrap: break-word;
+  word-break: keep-all;
 }
 
 .issuer-gate-card,
@@ -2274,6 +2395,54 @@ body {
   color: var(--color-neutral-800);
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
   font-weight: 800;
+}
+
+.route-title,
+.copy,
+.route-launcher-link__title,
+.route-launcher-link__copy,
+.tenant-trust-list,
+.tenant-wizard-fixture__title,
+.tenant-wizard-fixture__copy,
+.tenant-wizard-final-badges__title,
+.tenant-dashboard-vc-item__title,
+.tenant-dashboard-vc-item__copy,
+.verify-badge-item__title,
+.verify-badge-item__summary,
+.verify-badge-item__evidence,
+.issuer-log-item__event,
+.issuer-tx-item__title,
+.issuer-log-empty__title,
+.issuer-log-empty__copy,
+.issuer-simulator-fixture__title,
+.issuer-simulator-fixture__copy,
+.issuer-simulator-result__title,
+.issuer-simulator-result__copy,
+.issuer-simulator-step__title,
+.issuer-simulator-step__source {
+  line-break: loose;
+  overflow-wrap: break-word;
+  word-break: keep-all;
+}
+
+.route-launcher-link__meta,
+.tenant-dashboard-meta-row__value,
+.tenant-dashboard-share__url,
+.verify-meta-row__value,
+.ui-explorer-link__value,
+.issuer-log-identifier,
+.issuer-log-context-pill__value,
+.issuer-log-details__value,
+.issuer-tx-link__value,
+.issuer-simulator-step__pill,
+.issuer-simulator-step__link {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.issuer-log-identifier {
+  max-width: 100%;
 }
 
 .issuer-gate-form {

@@ -55,20 +55,20 @@ export const typeTokens = {
   },
   scale: {
     display: {
-      fontSize: '3.5rem',
-      lineHeight: '3.75rem',
-      letterSpacing: '-0.06em',
+      fontSize: '3rem',
+      lineHeight: '3.375rem',
+      letterSpacing: '-0.052em',
       fontWeight: 800
     },
     title: {
-      fontSize: '2rem',
-      lineHeight: '2.5rem',
+      fontSize: '1.75rem',
+      lineHeight: '2.125rem',
       letterSpacing: '-0.045em',
       fontWeight: 800
     },
     heading: {
-      fontSize: '1.5rem',
-      lineHeight: '2rem',
+      fontSize: '1.375rem',
+      lineHeight: '1.875rem',
       letterSpacing: '-0.035em',
       fontWeight: 760
     },
