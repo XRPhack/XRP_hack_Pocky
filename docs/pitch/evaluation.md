@@ -42,7 +42,7 @@
 
 | 문제 | 상세 |
 |------|------|
-| "스마트 컨트랙트로 검증" 표현 | XRPL에는 이더리움 방식 스마트 컨트랙트가 **없음**. `Hook`이 있지만 아직 Mainnet 미배포. 심사위원 중 XRPL 전문가가 이걸 지적하면 치명적 |
+| "스마트 컨트랙트로 검증" 표현 | XRPL에는 이더리움 방식 스마트 컨트랙트가 **없음**. `Hook`은 운영 네트워크 기능으로 발표하면 위험함. 심사위원 중 XRPL 전문가가 이걸 지적하면 치명적 |
 | 활용 기능 다양성 부족 | SBT+는 5가지(Credential, DepositPreauth, DIDSet, Merkle Root, CredentialCreate), HI-DORRI는 4가지. 노목돈은 Escrow+DID 2가지 중심 |
 | Cross-Currency Payment 미활용 | 해외 투자자가 참여할 수 있다면 XRPL의 **존재 이유**인 크로스보더 결제를 안 쓸 이유가 없음 |
 | PaymentChannel 미활용 | 월세 분할 납부에 최적인 기능인데 언급 없음 |
@@ -160,7 +160,7 @@
 
 ```diff
 - 임대차 계약 종료 및 명도 확인이 스마트 컨트랙트로 검증될 때만
-+ 임대차 계약 종료 및 명도 확인이 XRPL Escrow의 조건부 해제(Crypto-Condition)로 검증될 때만
++ 현재 v2 데모는 XRPL Testnet의 시간 기반 Escrow 증거로 보증금 잠금과 해제 가능 시점을 보여준다
 ```
 
 ---
