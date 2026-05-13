@@ -1,40 +1,72 @@
-import { createHashAnchor } from './hashing';
-import type { PropertyOffer, TenantProfile, XrplReservationProof } from './types';
+import { createHashAnchor } from './hashing.js';
+import type { PropertyOffer, TenantProfile, XrplReservationProof } from './types.js';
 
 const dropsPerXrp = 1_000_000;
-const krwPerDemoXrp = 1_000;
+const testnetReservationXrp = 10;
+const rippleEpochOffset = 946_684_800;
 
-export async function createDeterministicReservationProof(
+function toRippleTime(isoDate: string): number {
+  return Math.floor(new Date(isoDate).getTime() / 1000) - rippleEpochOffset;
+}
+
+export async function createEscrowContractDraft(
   tenant: TenantProfile,
   property: PropertyOffer,
-  state: XrplReservationProof['state'] = 'locked'
+  state: XrplReservationProof['state'] = 'ready-to-sign'
 ): Promise<XrplReservationProof> {
-  const memoHash = await createHashAnchor('reservation-escrow', {
+  const contractHash = await createHashAnchor('reservation-escrow-contract', {
     tenantId: tenant.id,
     propertyId: property.id,
     reservationAmountKrw: property.reservationAmountKrw,
+    ownerAccount: tenant.xrplAccount,
+    destinationAccount: property.escrowDestination,
     state
   });
-  const txHash = (await createHashAnchor('xrpl-fallback-tx', memoHash)).toUpperCase();
-  const escrowSequence = Number.parseInt(txHash.slice(0, 8), 16).toString();
-  const amountXrp = Math.round((property.reservationAmountKrw / krwPerDemoXrp) * dropsPerXrp) / dropsPerXrp;
+  const amountDrops = String(testnetReservationXrp * dropsPerXrp);
+  const finishAfterRippleTime = toRippleTime('2026-05-17T00:00:00.000Z');
+  const cancelAfterRippleTime = toRippleTime('2026-06-30T00:00:00.000Z');
+  const memo = {
+    Memo: {
+      MemoType: '6E6F6D6F6B646F6E2D657363726F77',
+      MemoData: contractHash.toUpperCase()
+    }
+  };
 
   return {
-    mode: 'deterministic-fallback',
+    mode: 'unsigned-transaction-draft',
     ledger: 'XRPL Testnet',
     state,
-    escrowSequence,
-    txHash,
-    explorerUrl: `https://testnet.xrpl.org/transactions/${txHash}`,
-    amountXrp,
-    memoHash,
+    ownerAccount: tenant.xrplAccount,
+    destinationAccount: property.escrowDestination,
+    amountXrp: testnetReservationXrp,
+    amountDrops,
+    contractHash,
+    finishAfterRippleTime,
+    cancelAfterRippleTime,
+    createTx: {
+      TransactionType: 'EscrowCreate',
+      Account: tenant.xrplAccount,
+      Destination: property.escrowDestination,
+      Amount: amountDrops,
+      FinishAfter: finishAfterRippleTime,
+      CancelAfter: cancelAfterRippleTime,
+      Memos: [memo]
+    },
+    finishTxTemplate: {
+      TransactionType: 'EscrowFinish',
+      Account: property.escrowDestination,
+      Owner: tenant.xrplAccount,
+      OfferSequence: 'FROM_VALIDATED_ESCROW_CREATE_SEQUENCE',
+      Memos: [memo]
+    },
+    cancelTxTemplate: {
+      TransactionType: 'EscrowCancel',
+      Account: tenant.xrplAccount,
+      Owner: tenant.xrplAccount,
+      OfferSequence: 'FROM_VALIDATED_ESCROW_CREATE_SEQUENCE',
+      Memos: [memo]
+    },
     caveat:
-      '로컬 MVP는 seed, private key, 실제 KRW 이동 없이 결정론적 Testnet-style proof를 생성합니다. Live Testnet 제출은 xrpl.js 지갑 주입 후 연결할 TODO입니다.'
+      '이 화면은 가짜 tx hash가 아니라 XRPL 지갑 서명에 넘길 unsigned EscrowCreate transaction draft입니다. seed/private key는 앱에 저장하지 않고, 제출 후 validated Sequence를 EscrowFinish/EscrowCancel에 사용합니다.'
   };
 }
-
-export function getFallbackTxLinks(proof: XrplReservationProof): string[] {
-  return [proof.explorerUrl, `https://test.bithomp.com/explorer/${proof.txHash}`];
-}
-
-// TODO: Live Testnet wiring should accept an injected, user-owned signer and never store seeds in this repo or localStorage.

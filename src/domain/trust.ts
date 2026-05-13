@@ -1,4 +1,4 @@
-import type { PropertyOffer, RentPayment, TenantProfile, TrustBadge, TrustChecklist, XrplReservationProof } from './types';
+import type { PropertyOffer, RentReputation, TenantProfile, TrustBadge, TrustChecklist, XrplReservationProof } from './types.js';
 
 const dayMs = 24 * 60 * 60 * 1000;
 
@@ -92,13 +92,13 @@ function createRentBurdenBadge(rate: number): TrustBadge {
 }
 
 function createEscrowBadge(escrow: XrplReservationProof): TrustBadge {
-  return escrow.state === 'locked'
+  return escrow.state === 'ready-to-sign' || escrow.state === 'submitted'
     ? {
         id: 'escrow',
         label: '예약금 잠금 상태',
         status: 'pass',
-        summary: `${escrow.amountXrp} XRP Escrow proof`,
-        evidence: `Fallback TX ${escrow.txHash.slice(0, 12)}... 로컬 검증 링크 제공.`
+        summary: `${escrow.amountXrp} XRP EscrowCreate 준비`,
+        evidence: `서명 대기 transaction draft. Contract hash ${escrow.contractHash.slice(0, 12)}...`
       }
     : {
         id: 'escrow',
@@ -109,34 +109,40 @@ function createEscrowBadge(escrow: XrplReservationProof): TrustBadge {
       };
 }
 
-function createRentHistoryBadge(history: RentPayment[]): TrustBadge {
-  const paidCount = history.filter((payment) => payment.status === 'paid').length;
-  const lateCount = history.filter((payment) => payment.status === 'late').length;
-  const missedCount = history.filter((payment) => payment.status === 'missed').length;
-
-  if (missedCount > 0) {
+function createRentReputationBadge(reputation: RentReputation): TrustBadge {
+  if (reputation.missedCount > 0) {
     return {
       id: 'rent-history',
-      label: '과거 납부 이력',
+      label: '월세 평판 등급',
       status: 'fail',
-      summary: `${missedCount}회 미납`,
-      evidence: '월세 이력 해시 앵커에는 원본 개인정보 없이 납부 상태만 반영.'
+      summary: `등급 ${reputation.grade}`,
+      evidence: reputation.summary
+    };
+  }
+
+  if (reputation.grade === 'C') {
+    return {
+      id: 'rent-history',
+      label: '월세 평판 등급',
+      status: 'warning',
+      summary: `등급 ${reputation.grade}`,
+      evidence: reputation.summary
     };
   }
 
   return {
     id: 'rent-history',
-    label: '과거 납부 이력',
-    status: lateCount > 1 ? 'warning' : 'pass',
-    summary: `${paidCount}개월 정상 납부${lateCount ? `, ${lateCount}회 지연` : ''}`,
-    evidence: 'RLUSD Payment는 Phase 0에서 해시 앵커로만 표현.'
+    label: '월세 평판 등급',
+    status: 'pass',
+    summary: `등급 ${reputation.grade}`,
+    evidence: `${reputation.observedMonths}개월 기준 정상 납부율 ${reputation.onTimeRate}%. 상세 납부일/금액은 임대인에게 공개하지 않음.`
   };
 }
 
 export function calculateTrustChecklist(
   tenant: TenantProfile,
   property: PropertyOffer,
-  rentHistory: RentPayment[],
+  rentReputation: RentReputation,
   escrow: XrplReservationProof,
   now = new Date('2026-05-10T00:00:00.000Z')
 ): TrustChecklist {
@@ -146,7 +152,7 @@ export function calculateTrustChecklist(
     createEmploymentBadge(tenant),
     createRentBurdenBadge(rentBurdenRate),
     createEscrowBadge(escrow),
-    createRentHistoryBadge(rentHistory)
+    createRentReputationBadge(rentReputation)
   ];
   const failCount = badges.filter((badge) => badge.status === 'fail').length;
   const warningCount = badges.filter((badge) => badge.status === 'warning').length;

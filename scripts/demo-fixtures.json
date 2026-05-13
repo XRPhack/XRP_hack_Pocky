@@ -1,0 +1,110 @@
+{
+  "generatedAt": "2026-05-12T12:50:33.930Z",
+  "network": {
+    "name": "XRPL Testnet",
+    "websocket": "wss://s.altnet.rippletest.net:51233",
+    "explorerBaseUrl": "https://testnet.xrpl.org/transactions"
+  },
+  "persona": {
+    "id": "mina-p",
+    "displayName": "Mina P.",
+    "nationality": "Philippines",
+    "visaType": "D-4",
+    "visaExpiresAt": "2027-05-12T00:00:00.000Z",
+    "schoolOrEmployer": "Nomok Language Institute",
+    "monthlyIncomeKrw": 2900000
+  },
+  "accounts": {
+    "tenant": {
+      "role": "tenant",
+      "address": "rh1rT8ibPrNUZuUzVaa2CFN2E7sub5aayV"
+    },
+    "issuer": {
+      "role": "issuer",
+      "address": "rNuVKokAu5jCzMfS2vpMSUVN64QBaMKjNe"
+    },
+    "landlord": {
+      "role": "landlord",
+      "address": "rGSr4edSvPTWkafCjLRrqPbkaPWBtQJrTP"
+    }
+  },
+  "transactions": [
+    {
+      "label": "Mina P. DIDSet",
+      "transactionType": "DIDSet",
+      "hash": "10792A6D1D9F215431D70D98B46BA98307FE193E8DE1DB8EEA21B7040711AA0C",
+      "validated": true,
+      "ledgerIndex": 17310574,
+      "ledgerDate": "2026-05-12T12:49:52Z",
+      "explorerUrl": "https://testnet.xrpl.org/transactions/10792A6D1D9F215431D70D98B46BA98307FE193E8DE1DB8EEA21B7040711AA0C",
+      "submittedBy": "tenant",
+      "account": "rh1rT8ibPrNUZuUzVaa2CFN2E7sub5aayV"
+    },
+    {
+      "label": "Visa CredentialCreate",
+      "transactionType": "CredentialCreate",
+      "hash": "02DCE07D789019D181B940509EA12C76D9CB32587F070B28C4E80194B75881C8",
+      "validated": true,
+      "ledgerIndex": 17310576,
+      "ledgerDate": "2026-05-12T12:50:01Z",
+      "explorerUrl": "https://testnet.xrpl.org/transactions/02DCE07D789019D181B940509EA12C76D9CB32587F070B28C4E80194B75881C8",
+      "submittedBy": "issuer",
+      "account": "rNuVKokAu5jCzMfS2vpMSUVN64QBaMKjNe"
+    },
+    {
+      "label": "Visa CredentialAccept",
+      "transactionType": "CredentialAccept",
+      "hash": "C4A9CAE024619B0C13F2DD0A5C508D9AB567EBE1FCAA972BA04AD74D32379D56",
+      "validated": true,
+      "ledgerIndex": 17310578,
+      "ledgerDate": "2026-05-12T12:50:10Z",
+      "explorerUrl": "https://testnet.xrpl.org/transactions/C4A9CAE024619B0C13F2DD0A5C508D9AB567EBE1FCAA972BA04AD74D32379D56",
+      "submittedBy": "tenant",
+      "account": "rh1rT8ibPrNUZuUzVaa2CFN2E7sub5aayV"
+    },
+    {
+      "label": "Rent reputation CredentialCreate",
+      "transactionType": "CredentialCreate",
+      "hash": "7779F39F36276C93B7F1620D054734382B775D6F0292EAEB332085690C31CDAE",
+      "validated": true,
+      "ledgerIndex": 17310580,
+      "ledgerDate": "2026-05-12T12:50:12Z",
+      "explorerUrl": "https://testnet.xrpl.org/transactions/7779F39F36276C93B7F1620D054734382B775D6F0292EAEB332085690C31CDAE",
+      "submittedBy": "issuer",
+      "account": "rNuVKokAu5jCzMfS2vpMSUVN64QBaMKjNe"
+    },
+    {
+      "label": "Rent reputation CredentialAccept",
+      "transactionType": "CredentialAccept",
+      "hash": "D7865A601B0BB3F4E70125A957F8397DD9A2B78B425F761E1021EFFF089C37A8",
+      "validated": true,
+      "ledgerIndex": 17310582,
+      "ledgerDate": "2026-05-12T12:50:21Z",
+      "explorerUrl": "https://testnet.xrpl.org/transactions/D7865A601B0BB3F4E70125A957F8397DD9A2B78B425F761E1021EFFF089C37A8",
+      "submittedBy": "tenant",
+      "account": "rh1rT8ibPrNUZuUzVaa2CFN2E7sub5aayV"
+    },
+    {
+      "label": "Reservation EscrowCreate",
+      "transactionType": "EscrowCreate",
+      "hash": "BEAE9BA0916013DC5B9C41A87C2412D03853CBB149A6E5A751A3075B8EF273AF",
+      "validated": true,
+      "ledgerIndex": 17310584,
+      "ledgerDate": "2026-05-12T12:50:30Z",
+      "explorerUrl": "https://testnet.xrpl.org/transactions/BEAE9BA0916013DC5B9C41A87C2412D03853CBB149A6E5A751A3075B8EF273AF",
+      "submittedBy": "tenant",
+      "account": "rh1rT8ibPrNUZuUzVaa2CFN2E7sub5aayV"
+    },
+    {
+      "label": "May rent Payment with memo",
+      "transactionType": "Payment",
+      "hash": "BA8EFF5E7735974BC691415A9004138EBDAD00CAAECFC01B836FF9B85619C9C9",
+      "validated": true,
+      "ledgerIndex": 17310586,
+      "ledgerDate": "2026-05-12T12:50:32Z",
+      "explorerUrl": "https://testnet.xrpl.org/transactions/BA8EFF5E7735974BC691415A9004138EBDAD00CAAECFC01B836FF9B85619C9C9",
+      "submittedBy": "tenant",
+      "account": "rh1rT8ibPrNUZuUzVaa2CFN2E7sub5aayV"
+    }
+  ]
+}

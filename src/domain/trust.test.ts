@@ -2,14 +2,20 @@ import { describe, expect, it } from 'vitest';
 import { buildShareableReport, createExpiredVisaScenario, createHighRentBurdenScenario, demoScenario } from './scenario';
 
 describe('NomokDon trust checklist', () => {
-  it('creates a shareable default report with hashed proof and fallback XRPL state', async () => {
+  it('creates a shareable default report with XRPL DID and unsigned escrow transaction drafts', async () => {
     const report = await buildShareableReport(demoScenario);
 
     expect(report.checklist.level).toBe('share-ready');
+    expect(report.proof.did).toBe(`did:xrpl:1:${demoScenario.tenant.xrplAccount}`);
+    expect(report.proof.didSetTransaction.TransactionType).toBe('DIDSet');
     expect(report.proof.subjectHash).toHaveLength(64);
     expect(report.proof.subjectHash).not.toContain(demoScenario.tenant.passportNumber);
-    expect(report.escrow.mode).toBe('deterministic-fallback');
-    expect(report.escrow.state).toBe('locked');
+    expect(report.escrow.mode).toBe('unsigned-transaction-draft');
+    expect(report.escrow.state).toBe('ready-to-sign');
+    expect(report.escrow.createTx.TransactionType).toBe('EscrowCreate');
+    expect(report.escrow.finishTxTemplate.TransactionType).toBe('EscrowFinish');
+    expect(report.escrow.cancelTxTemplate.TransactionType).toBe('EscrowCancel');
+    expect(report.rentReputation.grade).toBe('B');
   });
 
   it('degrades trust when visa is expired', async () => {

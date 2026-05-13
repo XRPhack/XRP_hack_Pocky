@@ -24,6 +24,10 @@ export async function createHashAnchor(label: string, payload: unknown): Promise
   return sha256Hex(`${label}:${stableJson(payload)}`);
 }
 
+export function stringToHex(value: string): string {
+  return [...encoder.encode(value)].map((byte) => byte.toString(16).padStart(2, '0')).join('').toUpperCase();
+}
+
 export function shortHash(hash: string): string {
   return `${hash.slice(0, 10)}...${hash.slice(-8)}`;
 }
