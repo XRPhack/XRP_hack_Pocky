@@ -6,3 +6,10 @@ dist/
 .env.*
 !.env.example
 *.log
+.vercel
+.sisyphus/boulder.json
+.sisyphus/evidence/
+.sisyphus/wave1-notes.md
+.sisyphus/notepads/
+.sisyphus/run-continuation/
+test-results/
