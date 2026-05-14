@@ -54,7 +54,7 @@ test('expired visa fixture stops credential issuance with renewal guide', async 
     await expect(page.getByRole('heading', { name: 'No trust pass yet', level: 1 })).toBeVisible();
     await page.getByRole('button', { name: 'Start creating a trust pass' }).click();
 
-    await expect(page.getByRole('heading', { name: '3-step trust pass wizard', level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Create trust pass', level: 1 })).toBeVisible();
     await page.locator('input[name="tenant-wizard-fixture"][value="edge"]').check();
     await expect(page.getByText('Expired visa fallback set')).toBeVisible();
     await expect(page.getByText('Expired visa', { exact: true })).toBeVisible();

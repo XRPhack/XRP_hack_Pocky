@@ -44,6 +44,11 @@ type VerifyResultScreenProps = VerifyScreenProps & {
   onPrint: () => void;
 };
 
+type VerifyEntryScreenProps = VerifyScreenProps & {
+  errorMessage?: string;
+  onSubmit: (reportId: string) => void;
+};
+
 type VerifyLoadingScreenProps = VerifyScreenProps & {
   reportId: string;
 };
@@ -96,7 +101,14 @@ function formatGeneratedAt(value: string, locale: Locale): string {
   }).format(date);
 }
 
-function createVerifyShell(locale: Locale, localeToggle: UiChild, children: UiChild, className?: string): HTMLElement {
+function createVerifyShell(
+  locale: Locale,
+  localeToggle: UiChild,
+  children: UiChild,
+  className?: string,
+  title = t('verifyResultTitle', locale),
+  copy = t('verifyResultCopy', locale)
+): HTMLElement {
   const shell = document.createElement('main');
   shell.className = cx('verify-page', className);
 
@@ -108,8 +120,8 @@ function createVerifyShell(locale: Locale, localeToggle: UiChild, children: UiCh
   appendChildren(
     header,
     createTextElement('p', 'eyebrow', t('verifyEyebrow', locale)),
-    createTextElement('h1', 'verify-page__title', t('verifyResultTitle', locale)),
-    createTextElement('p', 'verify-page__copy', t('verifyResultCopy', locale))
+    createTextElement('h1', 'verify-page__title', title),
+    createTextElement('p', 'verify-page__copy', copy)
   );
 
   appendChildren(frame, localeToggle, header, children);
@@ -276,6 +288,73 @@ export function getFixtureEvidenceLinks(): VerifyEvidenceLink[] {
     href: transaction.explorerUrl,
     network: fixtureData.network.name
   }));
+}
+
+export function VerifyEntryScreen({ locale, localeToggle, errorMessage, onSubmit }: VerifyEntryScreenProps): HTMLElement {
+  const normalizedLocale = normalizeLocale(locale);
+  const inputId = 'verify-report-id-input';
+  const errorId = 'verify-report-id-error';
+  const form = document.createElement('form');
+  form.className = 'verify-entry-form';
+  form.noValidate = true;
+
+  const input = document.createElement('input');
+  input.className = 'verify-entry-form__input';
+  input.id = inputId;
+  input.name = 'reportId';
+  input.placeholder = t('verifyEntryInputPlaceholder', normalizedLocale);
+  input.type = 'text';
+  input.autocomplete = 'off';
+  input.setAttribute('aria-invalid', String(Boolean(errorMessage)));
+
+  if (errorMessage) {
+    input.setAttribute('aria-describedby', errorId);
+  }
+
+  const submitButton = document.createElement('button');
+  submitButton.className = 'verify-action-button verify-action-button--primary verify-entry-form__submit';
+  submitButton.type = 'submit';
+  submitButton.textContent = t('verifyEntrySubmit', normalizedLocale);
+
+  const label = createTextElement('label', 'verify-entry-form__label', t('verifyEntryInputLabel', normalizedLocale));
+  label.htmlFor = inputId;
+
+  const error = errorMessage ? createTextElement('p', 'verify-entry-form__error', errorMessage) : null;
+  if (error) {
+    error.id = errorId;
+    error.setAttribute('role', 'alert');
+  }
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    onSubmit(input.value);
+  });
+
+  appendChildren(
+    form,
+    label,
+    input,
+    error,
+    submitButton
+  );
+
+  const card = Card({
+    eyebrow: t('verifyEntryCardEyebrow', normalizedLocale),
+    title: t('verifyEntryCardTitle', normalizedLocale),
+    description: t('verifyEntryCardCopy', normalizedLocale),
+    children: form,
+    elevated: true
+  });
+  card.classList.add('verify-entry-card');
+
+  return createVerifyShell(
+    normalizedLocale,
+    localeToggle,
+    card,
+    'verify-page--entry',
+    t('verifyEntryTitle', normalizedLocale),
+    t('verifyEntryCopy', normalizedLocale)
+  );
 }
 
 export function VerifyLoadingScreen({ locale, reportId, localeToggle }: VerifyLoadingScreenProps): HTMLElement {

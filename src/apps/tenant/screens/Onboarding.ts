@@ -1,6 +1,6 @@
 import { normalizeLocale, t, type Locale } from '../../../shared/i18n';
-import { Badge, Card } from '../../../shared/ui';
-import { appendChildren, createTextElement, type UiChild } from '../../../shared/ui/dom';
+import { Card } from '../../../shared/ui';
+import { appendChildren, type UiChild } from '../../../shared/ui/dom';
 
 type OnboardingScreenProps = {
   locale: Locale;
@@ -12,35 +12,18 @@ type OnboardingScreenProps = {
 
 const onboardingStepKeys = [
   {
-    icon: '🪪',
     title: 'tenantOnboardingStepResidentTitle',
     copy: 'tenantOnboardingStepResidentCopy'
   },
   {
-    icon: '🏠',
     title: 'tenantOnboardingStepHousingTitle',
     copy: 'tenantOnboardingStepHousingCopy'
   },
   {
-    icon: '🤝',
     title: 'tenantOnboardingStepTrustTitle',
     copy: 'tenantOnboardingStepTrustCopy'
   }
 ] as const;
-
-function createProgressDots(activeIndex: number): HTMLDivElement {
-  const dots = document.createElement('div');
-  dots.className = 'tenant-stepper';
-  dots.setAttribute('aria-hidden', 'true');
-
-  onboardingStepKeys.forEach((_, index) => {
-    const dot = document.createElement('span');
-    dot.className = `tenant-stepper__dot${index === activeIndex ? ' tenant-stepper__dot--active' : ''}`;
-    dots.appendChild(dot);
-  });
-
-  return dots;
-}
 
 export function OnboardingScreen({ locale, stepIndex, localeToggle, onNext, onStart }: OnboardingScreenProps): HTMLElement {
   const normalizedLocale = normalizeLocale(locale);
@@ -60,11 +43,6 @@ export function OnboardingScreen({ locale, stepIndex, localeToggle, onNext, onSt
     eyebrow: t('tenantOnboardingEyebrow', normalizedLocale),
     title: t(step.title, normalizedLocale),
     description: t(step.copy, normalizedLocale),
-    children: [
-      createTextElement('span', 'tenant-onboarding-icon', step.icon),
-      createProgressDots(boundedStepIndex),
-      createTextElement('p', 'tenant-onboarding-counter', t('tenantOnboardingCounter', normalizedLocale).replace('{current}', String(boundedStepIndex + 1)).replace('{total}', String(onboardingStepKeys.length)))
-    ],
     elevated: true
   });
   card.classList.add('tenant-onboarding-card');
@@ -76,7 +54,7 @@ export function OnboardingScreen({ locale, stepIndex, localeToggle, onNext, onSt
   action.textContent = isFinalStep ? t('tenantOnboardingStart', normalizedLocale) : t('tenantOnboardingNext', normalizedLocale);
   action.addEventListener('click', isFinalStep ? onStart : onNext);
 
-  appendChildren(panel, localeToggle, Badge({ label: t('tenantOnboardingBadge', normalizedLocale), variant: 'success' }), card, action);
+  appendChildren(panel, localeToggle, card, action);
   screen.appendChild(panel);
   return screen;
 }

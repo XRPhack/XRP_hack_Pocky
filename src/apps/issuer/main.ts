@@ -1,5 +1,7 @@
 import '../../styles.css';
-import { normalizeLocale, t, type Locale } from '../../shared/i18n';
+import { getLocalePreference, setLocalePreference } from '../../shared/auth/session';
+import { t, type Locale } from '../../shared/i18n';
+import { HistoryControls } from '../../shared/ui';
 import { getAppRoot } from '../app-placeholder';
 import {
   IssuerGateScreen,
@@ -41,7 +43,7 @@ const root = getAppRoot();
 const LOGS_POLL_INTERVAL_MS = 5_000;
 
 const state: IssuerState = {
-  locale: normalizeLocale(navigator.language),
+  locale: getLocalePreference(navigator.language),
   status: 'checking',
   logs: [],
   logsStatus: 'idle',
@@ -263,13 +265,23 @@ function createLocaleToggle(): HTMLDivElement {
     button.textContent = t(nextLocale === 'ko' ? 'korean' : 'english', state.locale);
     button.setAttribute('aria-pressed', String(isActive));
     button.addEventListener('click', () => {
-      state.locale = nextLocale;
+      state.locale = setLocalePreference(nextLocale);
       render();
     });
     group.appendChild(button);
   }
 
   return group;
+}
+
+function createHeaderActions(): HTMLDivElement {
+  const actions = document.createElement('div');
+  actions.className = 'route-header-actions issuer-header-actions';
+  actions.append(
+    HistoryControls({ backLabel: state.locale === 'ko' ? '뒤로' : 'Back' }),
+    createLocaleToggle()
+  );
+  return actions;
 }
 
 function getGateStatus(): IssuerGateStatus {
@@ -392,7 +404,7 @@ async function runIssuerSimulator(): Promise<void> {
 }
 
 function render(): void {
-  const localeToggle = createLocaleToggle();
+  const localeToggle = createHeaderActions();
   const isUnlocked = state.status === 'unlocked';
 
   if (isUnlocked) {

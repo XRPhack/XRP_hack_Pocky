@@ -74,26 +74,23 @@ test('login to landlord confirmation happy path', async ({ browser }) => {
 
     await page.getByRole('button', { name: 'Continue with Toss mock login' }).click();
     await expect(page.getByRole('heading', { name: 'Keep foreign-resident context safe' })).toBeVisible();
-    await expect(page.getByText('Step 1/3')).toBeVisible();
     await expectTenantSessionStorage(page);
     await expectNoSensitiveValues(page);
     await saveEvidence(page, '02-onboarding-resident.png');
 
     await page.getByRole('button', { name: 'Next' }).click();
     await expect(page.getByRole('heading', { name: 'Explain readiness while finding a home' })).toBeVisible();
-    await expect(page.getByText('Step 2/3')).toBeVisible();
     await saveEvidence(page, '03-onboarding-housing.png');
 
     await page.getByRole('button', { name: 'Next' }).click();
     await expect(page.getByRole('heading', { name: 'Trust through reasons, not scores' })).toBeVisible();
-    await expect(page.getByText('Step 3/3')).toBeVisible();
     await saveEvidence(page, '04-onboarding-trust.png');
 
     await page.getByRole('button', { name: 'Start' }).click();
     await expect(page.getByRole('heading', { name: 'No trust pass yet', level: 1 })).toBeVisible();
     await page.getByRole('button', { name: 'Start creating a trust pass' }).click();
 
-    await expect(page.getByRole('heading', { name: '3-step trust pass wizard', level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Create trust pass', level: 1 })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Create DID' })).toBeVisible();
     await page.getByRole('button', { name: 'Confirm DID' }).click();
     await expect(page.getByRole('link', { name: /DIDSet/ })).toBeVisible();
@@ -126,9 +123,10 @@ test('login to landlord confirmation happy path', async ({ browser }) => {
     await page.getByRole('button', { name: 'Return to the trust pass dashboard' }).click();
     await expect(page.getByRole('heading', { name: 'Ready to show your landlord', level: 1 })).toBeVisible();
 
-    const shareUrl = page.locator('code.tenant-dashboard-share__url');
-    await expect(shareUrl).toHaveText(/^\/verify\/report_/);
-    const verifyPath = (await shareUrl.textContent())?.trim() ?? '';
+    const reportLink = page.getByRole('link', { name: 'Open verification report' });
+    const reportHref = await reportLink.getAttribute('href');
+    expect(reportHref).not.toBeNull();
+    const verifyPath = new URL(reportHref ?? '', page.url()).pathname;
     expect(verifyPath).toMatch(/^\/verify\/report_/);
     await expect(page.locator('a.tenant-dashboard-qr')).toHaveAttribute('href', new URL(verifyPath, page.url()).toString());
     await page.getByRole('button', { name: 'Copy verification report link' }).click();

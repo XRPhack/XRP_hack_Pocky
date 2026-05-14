@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { clearSession, getSession, SESSION_STORAGE_KEY, setSession } from './session';
+import { clearSession, getLocalePreference, getSession, LOCALE_STORAGE_KEY, SESSION_STORAGE_KEY, setLocalePreference, setSession } from './session';
 
 function createLocalStorageMock() {
   const store = new Map<string, string>();
@@ -21,13 +21,20 @@ function createLocalStorageMock() {
 }
 
 let localStorageMock: ReturnType<typeof createLocalStorageMock>;
+let sessionStorageMock: ReturnType<typeof createLocalStorageMock>;
 
 describe('auth session store', () => {
   beforeEach(() => {
     localStorageMock = createLocalStorageMock();
+    sessionStorageMock = createLocalStorageMock();
 
     Object.defineProperty(globalThis, 'localStorage', {
       value: localStorageMock,
+      configurable: true,
+      writable: true
+    });
+    Object.defineProperty(globalThis, 'sessionStorage', {
+      value: sessionStorageMock,
       configurable: true,
       writable: true
     });
@@ -134,5 +141,12 @@ describe('auth session store', () => {
     expect(stored).not.toContain('top-secret');
     expect(stored).not.toContain('also-secret');
     expect(stored).not.toContain('private-secret');
+  });
+
+  it('persists locale preference outside the session id', () => {
+    expect(setLocalePreference('ko-KR')).toBe('ko');
+    expect(getLocalePreference('en-US')).toBe('ko');
+    expect(sessionStorageMock.getItem(LOCALE_STORAGE_KEY)).toBe('ko');
+    expect(localStorageMock.getItem(SESSION_STORAGE_KEY)).toBeNull();
   });
 });

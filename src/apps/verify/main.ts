@@ -1,7 +1,10 @@
 import '../../styles.css';
-import { normalizeLocale, t, type Locale } from '../../shared/i18n';
+import { getLocalePreference, setLocalePreference } from '../../shared/auth/session';
+import { t, type Locale } from '../../shared/i18n';
+import { HistoryControls } from '../../shared/ui';
 import { getAppRoot } from '../app-placeholder';
 import {
+  VerifyEntryScreen,
   VerifyErrorScreen,
   VerifyLoadingScreen,
   VerifyResultScreen,
@@ -17,12 +20,13 @@ type VerifyBadgeStatus = VerifyBadge['status'];
 type VerifyTrustGrade = VerifyReport['trustGrade'];
 
 type VerifyViewState =
+  | { status: 'entry'; hasValidationError?: boolean }
   | { status: 'loading'; reportId: string }
   | { status: 'error'; title: string; description: string }
   | { status: 'result'; report: VerifyReport; evidenceLinks: VerifyEvidenceLink[]; confirmationStatus: VerifyConfirmationStatus };
 
 const root = getAppRoot();
-let locale: Locale = normalizeLocale(navigator.language);
+let locale: Locale = getLocalePreference(navigator.language);
 let viewState: VerifyViewState;
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -79,13 +83,35 @@ function createLocaleToggle(): HTMLElement {
     button.textContent = t(nextLocale === 'ko' ? 'korean' : 'english', locale);
     button.setAttribute('aria-pressed', String(isActive));
     button.addEventListener('click', () => {
-      locale = nextLocale;
+      locale = setLocalePreference(nextLocale);
       render();
     });
     group.appendChild(button);
   }
 
   return group;
+}
+
+function createHeaderActions(): HTMLDivElement {
+  const actions = document.createElement('div');
+  actions.className = 'route-header-actions verify-header-actions';
+  actions.append(
+    HistoryControls({ backLabel: locale === 'ko' ? '뒤로' : 'Back' }),
+    createLocaleToggle()
+  );
+  return actions;
+}
+
+function submitReportId(reportId: string): void {
+  const trimmedReportId = reportId.trim();
+
+  if (!trimmedReportId) {
+    viewState = { status: 'entry', hasValidationError: true };
+    render();
+    return;
+  }
+
+  window.location.assign(`/verify/${encodeURIComponent(trimmedReportId)}`);
 }
 
 function parseBadge(value: unknown): VerifyBadge | undefined {
@@ -276,7 +302,19 @@ function printVerifyResult(): void {
 
 function render(): void {
   root.innerHTML = '';
-  const localeToggle = createLocaleToggle();
+  const localeToggle = createHeaderActions();
+
+  if (viewState.status === 'entry') {
+    root.appendChild(
+      VerifyEntryScreen({
+        locale,
+        localeToggle,
+        errorMessage: viewState.hasValidationError ? t('verifyEntryRequired', locale) : undefined,
+        onSubmit: submitReportId
+      })
+    );
+    return;
+  }
 
   if (viewState.status === 'loading') {
     root.appendChild(VerifyLoadingScreen({ locale, reportId: viewState.reportId, localeToggle }));
@@ -306,11 +344,7 @@ function render(): void {
 const reportId = getReportIdFromPath(window.location.pathname);
 
 if (!reportId) {
-  viewState = {
-    status: 'error',
-    title: t('verifyMissingReportTitle', locale),
-    description: t('verifyMissingReportCopy', locale)
-  };
+  viewState = { status: 'entry' };
   render();
 } else {
   viewState = { status: 'loading', reportId };

@@ -19,7 +19,6 @@ export type DashboardBadge = {
 
 type DashboardScreenProps = {
   locale: Locale;
-  reportId: string;
   verifyUrl: string;
   trustGrade: DashboardTrustGrade;
   badges: [DashboardBadge, DashboardBadge, DashboardBadge, DashboardBadge, DashboardBadge, DashboardBadge];
@@ -247,20 +246,27 @@ function createShareButton(className: string, label: string, ariaLabel: string, 
   return button;
 }
 
-function createSharePanel(locale: Locale, reportId: string, verifyUrl: string, shareFeedbackKey: DashboardShareFeedbackKey | undefined, onCopyLink: () => void, onShare: () => void): HTMLElement {
-  const verifyPath = createVerifyPath(reportId);
-  const urlText = createTextElement('code', 'tenant-dashboard-share__url', verifyPath);
-  urlText.setAttribute('aria-label', t('tenantDashboardShareUrlA11y', locale).replace('{url}', verifyPath));
+function createShareLink(className: string, label: string, ariaLabel: string, href: string): HTMLAnchorElement {
+  const link = document.createElement('a');
+  link.className = className;
+  link.href = href;
+  link.textContent = label;
+  link.setAttribute('aria-label', ariaLabel);
+  return link;
+}
+
+function createSharePanel(locale: Locale, verifyUrl: string, shareFeedbackKey: DashboardShareFeedbackKey | undefined, onCopyLink: () => void, onShare: () => void): HTMLElement {
+  const copyButton = createShareButton('tenant-dashboard-share__copy-card', t('tenantDashboardCopyLink', locale), t('tenantDashboardCopyLinkA11y', locale), onCopyLink);
 
   const actions = document.createElement('div');
   actions.className = 'tenant-dashboard-share__actions';
   appendChildren(
     actions,
-    createShareButton('tenant-primary-action tenant-dashboard-share__action', t('tenantDashboardCopyLink', locale), t('tenantDashboardCopyLinkA11y', locale), onCopyLink),
+    createShareLink('tenant-primary-action tenant-dashboard-share__action', t('tenantDashboardOpenReport', locale), t('tenantDashboardOpenReportA11y', locale), verifyUrl),
     createShareButton('tenant-dashboard-secondary-action tenant-dashboard-share__action', t('tenantDashboardWebShare', locale), t('tenantDashboardWebShareA11y', locale), onShare)
   );
 
-  const children: UiChild[] = [createQrVisual(verifyUrl, locale), urlText, actions];
+  const children: UiChild[] = [createQrVisual(verifyUrl, locale), copyButton, actions];
   if (shareFeedbackKey) {
     children.push(Toast({ message: t(shareFeedbackKey, locale), variant: shareFeedbackKey.includes('Success') ? 'success' : 'warning' }));
   }
@@ -275,7 +281,7 @@ function createSharePanel(locale: Locale, reportId: string, verifyUrl: string, s
   return panel;
 }
 
-export function DashboardScreen({ locale, reportId, verifyUrl, trustGrade, badges, tenantName, walletAddress, shareFeedbackKey, localeToggle, onUnlock, onCopyLink, onShare }: DashboardScreenProps): HTMLElement {
+export function DashboardScreen({ locale, verifyUrl, trustGrade, badges, tenantName, walletAddress, shareFeedbackKey, localeToggle, onUnlock, onCopyLink, onShare }: DashboardScreenProps): HTMLElement {
   const normalizedLocale = normalizeLocale(locale);
   const content = document.createElement('div');
   content.className = 'tenant-dashboard-content';
@@ -286,7 +292,7 @@ export function DashboardScreen({ locale, reportId, verifyUrl, trustGrade, badge
     createContextCard(normalizedLocale, tenantName, walletAddress),
     createVcListCard(normalizedLocale),
     createBadgesCard(normalizedLocale, badges),
-    createSharePanel(normalizedLocale, reportId, verifyUrl, shareFeedbackKey, onCopyLink, onShare)
+    createSharePanel(normalizedLocale, verifyUrl, shareFeedbackKey, onCopyLink, onShare)
   );
 
   return MobileShell({

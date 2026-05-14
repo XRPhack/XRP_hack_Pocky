@@ -4,5 +4,6 @@ export { EmptyState } from './empty-state';
 export { ErrorState } from './error-state';
 export { ExplorerLink } from './explorer-link';
 export { LoadingOverlay } from './loading-overlay';
+export { HistoryControls } from './history-controls';
 export { MobileShell } from './mobile-shell';
 export { Toast } from './toast';

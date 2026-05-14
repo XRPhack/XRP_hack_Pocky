@@ -1,4 +1,5 @@
 export {
+  VerifyEntryScreen,
   VerifyErrorScreen,
   VerifyLoadingScreen,
   VerifyResultScreen,

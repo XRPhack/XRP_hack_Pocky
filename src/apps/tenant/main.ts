@@ -1,7 +1,8 @@
 import '../../styles.css';
 import { visaEdgeCase, visaHappyCase, visaMockAdapter } from '../../domain/adapters/visa.fixture';
-import { getSession, setSession, type TossOAuthMockSessionInput } from '../../shared/auth/session';
-import { normalizeLocale, t, type Locale } from '../../shared/i18n';
+import { getLocalePreference, getSession, setLocalePreference, setSession, type TossOAuthMockSessionInput } from '../../shared/auth/session';
+import { t, type Locale } from '../../shared/i18n';
+import { HistoryControls } from '../../shared/ui';
 import { getAppRoot } from '../app-placeholder';
 import {
   DashboardScreen,
@@ -57,7 +58,7 @@ const mockTenant = {
 const root = getAppRoot();
 const state: TenantState = {
   stage: 'login',
-  locale: normalizeLocale(getSession()?.locale ?? navigator.language),
+  locale: getLocalePreference(getSession()?.locale ?? navigator.language),
   loginStatus: 'idle',
   onboardingStepIndex: 0,
   trustPassPlaceholderVisible: false,
@@ -146,13 +147,23 @@ function createLocaleToggle(): HTMLDivElement {
     button.textContent = t(nextLocale === 'ko' ? 'korean' : 'english', state.locale);
     button.setAttribute('aria-pressed', String(isActive));
     button.addEventListener('click', () => {
-      state.locale = nextLocale;
+      state.locale = setLocalePreference(nextLocale);
       render();
     });
     group.appendChild(button);
   }
 
   return group;
+}
+
+function createHeaderActions(): HTMLDivElement {
+  const actions = document.createElement('div');
+  actions.className = 'route-header-actions tenant-header-actions';
+  actions.append(
+    HistoryControls({ backLabel: state.locale === 'ko' ? '뒤로' : 'Back' }),
+    createLocaleToggle()
+  );
+  return actions;
 }
 
 function showOnboarding(): void {
@@ -418,7 +429,7 @@ async function handleLogin(): Promise<void> {
     const session = parseMockSession(await response.json());
     const sanitizedSession = setSession(session);
 
-    state.locale = normalizeLocale(sanitizedSession.locale);
+    state.locale = setLocalePreference(sanitizedSession.locale);
     showOnboarding();
   } catch (error) {
     state.loginStatus = 'error';
@@ -435,7 +446,7 @@ function renderHome(): HTMLElement {
   return HomeScreen({
     locale: state.locale,
     sessionName: session?.name,
-    localeToggle: createLocaleToggle(),
+    localeToggle: createHeaderActions(),
     showPlaceholderToast: state.trustPassPlaceholderVisible,
     onCreateTrustPass: showWizard
   });
@@ -452,14 +463,13 @@ function renderDashboard(): HTMLElement {
 
   return DashboardScreen({
     locale: state.locale,
-    reportId: state.reportId,
     verifyUrl: getAbsoluteVerifyUrl(),
     trustGrade: state.trustGrade,
     badges: state.dashboardBadges,
     tenantName: session?.name,
     walletAddress: session?.tenantWalletAddress,
     shareFeedbackKey: state.shareFeedbackKey,
-    localeToggle: createLocaleToggle(),
+    localeToggle: createHeaderActions(),
     onUnlock: showTossUnlock,
     onCopyLink: () => {
       void handleCopyShareLink();
@@ -481,7 +491,7 @@ function renderTossUnlock(): HTMLElement {
 
   return TossUnlockScreen({
     locale: state.locale,
-    localeToggle: createLocaleToggle(),
+    localeToggle: createHeaderActions(),
     tenantName: session?.name,
     onBack: () => {
       state.stage = 'dashboard';
@@ -498,7 +508,7 @@ function render(): void {
         locale: state.locale,
         status: state.loginStatus,
         errorMessage: state.errorMessage,
-        localeToggle: createLocaleToggle(),
+        localeToggle: createHeaderActions(),
         onLogin: () => {
           void handleLogin();
         }
@@ -513,7 +523,7 @@ function render(): void {
       OnboardingScreen({
         locale: state.locale,
         stepIndex: state.onboardingStepIndex,
-        localeToggle: createLocaleToggle(),
+        localeToggle: createHeaderActions(),
         onNext: () => {
           state.onboardingStepIndex += 1;
           render();
@@ -538,7 +548,7 @@ function render(): void {
         reportBadges: state.reportBadges,
         selectedFixtureId: state.selectedFixtureId,
         isFixtureLocked: isFixtureLocked(),
-        localeToggle: createLocaleToggle(),
+        localeToggle: createHeaderActions(),
         onFixtureChange: selectWizardFixture,
         onRunStep: (stepIndex) => {
           void runWizardStep(stepIndex);

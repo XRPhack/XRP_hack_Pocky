@@ -297,7 +297,7 @@ export function WizardScreen({ locale, activeStepIndex, steps, reportBadges, sel
     eyebrow: t('tenantWizardEyebrow', normalizedLocale),
     activeTabId: 'wizard',
     trailing: localeToggle,
-    tabs: [{ id: 'wizard', label: t('tenantWizardTab', normalizedLocale), icon: '◇' }],
+    tabs: [],
     children: content
   });
 }

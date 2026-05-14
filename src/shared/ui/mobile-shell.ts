@@ -73,6 +73,11 @@ export function MobileShell({
   content.className = 'ui-mobile-shell__content';
   appendChildren(content, children);
 
+  if (tabs.length === 0) {
+    appendChildren(shell, header, content);
+    return shell;
+  }
+
   const nav = document.createElement('nav');
   nav.className = 'ui-mobile-shell__nav';
   nav.setAttribute('aria-label', '하단 탭');

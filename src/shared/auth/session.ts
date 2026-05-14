@@ -1,4 +1,5 @@
 export const SESSION_STORAGE_KEY = 'nomokdon.session';
+export const LOCALE_STORAGE_KEY = 'nomokdon.locale';
 
 export type SessionLocale = 'en' | 'ko';
 
@@ -29,6 +30,7 @@ const sessionById = new Map<string, Session>();
 let activeSessionId: string | null = null;
 
 const memoryStorage = new Map<string, string>();
+const memoryLocaleStorage = new Map<string, string>();
 
 const memoryStorageAdapter: SessionStorageLike = {
   getItem(key) {
@@ -39,6 +41,18 @@ const memoryStorageAdapter: SessionStorageLike = {
   },
   removeItem(key) {
     memoryStorage.delete(key);
+  }
+};
+
+const memoryLocaleStorageAdapter: SessionStorageLike = {
+  getItem(key) {
+    return memoryLocaleStorage.get(key) ?? null;
+  },
+  setItem(key, value) {
+    memoryLocaleStorage.set(key, value);
+  },
+  removeItem(key) {
+    memoryLocaleStorage.delete(key);
   }
 };
 
@@ -54,6 +68,21 @@ function getStorage(): SessionStorageLike {
     return storage;
   } catch {
     return memoryStorageAdapter;
+  }
+}
+
+function getLocaleStorage(): SessionStorageLike {
+  const storage = globalThis.sessionStorage;
+
+  if (!storage) {
+    return memoryLocaleStorageAdapter;
+  }
+
+  try {
+    storage.getItem(LOCALE_STORAGE_KEY);
+    return storage;
+  } catch {
+    return memoryLocaleStorageAdapter;
   }
 }
 
@@ -121,8 +150,19 @@ export function setSession(session: TossOAuthMockSessionInput): Session {
   sessionById.set(sessionId, sanitized);
   activeSessionId = sessionId;
   getStorage().setItem(SESSION_STORAGE_KEY, sessionId);
+  setLocalePreference(sanitized.locale);
 
   return sanitized;
+}
+
+export function getLocalePreference(fallback?: unknown): SessionLocale {
+  return normalizeLocale(getLocaleStorage().getItem(LOCALE_STORAGE_KEY) ?? fallback);
+}
+
+export function setLocalePreference(locale: unknown): SessionLocale {
+  const normalizedLocale = normalizeLocale(locale);
+  getLocaleStorage().setItem(LOCALE_STORAGE_KEY, normalizedLocale);
+  return normalizedLocale;
 }
 
 export function getSession(): Session | null {

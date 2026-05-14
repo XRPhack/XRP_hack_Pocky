@@ -1,7 +1,7 @@
-import { getSession } from '../shared/auth/session';
+import { getLocalePreference, getSession, setLocalePreference } from '../shared/auth/session';
 import { Badge } from '../shared/ui';
 import { type AppRouteKey, routeIa } from '../shared/design-tokens';
-import { normalizeLocale, t, type Locale } from '../shared/i18n';
+import { t, type Locale } from '../shared/i18n';
 
 const routeCopyKeys = {
   tenant: {
@@ -32,22 +32,22 @@ const launcherHrefByRouteKey: Record<AppRouteKey, string> = {
 
 const launcherCopy = {
   ko: {
-    eyebrow: 'NomokDon MVP launcher',
-    title: '필요한 화면으로 바로 이동하세요.',
-    copy: '노목돈은 임차인 신뢰 패스, 임대인 검증, 발급자 운영 콘솔로 나뉩니다. 각 표면은 별도 Vite 엔트리로 열립니다.',
+    eyebrow: '노목돈 주거 신뢰 패스',
+    title: '목돈보다 먼저, 신뢰를 보여주세요.',
+    copy: '노목돈은 재한 외국인이 집을 구할 때 필요한 신뢰 근거를 만들고, 임대인이 개인정보 없이 확인할 수 있게 돕습니다.',
     surfaces: {
       tenant: {
-        title: 'Tenant',
+        title: '임차인 앱',
         badge: '임차인 앱',
         copy: '외국인 임차인이 목업 토스 로그인으로 신뢰 패스를 만들고 공유 링크를 준비합니다.'
       },
       verify: {
-        title: 'Verify',
+        title: '검증 페이지',
         badge: '임대인 검증',
         copy: '공유받은 리포트 ID를 기준으로 신뢰 배지와 XRPL 근거 링크를 확인합니다.'
       },
       issuer: {
-        title: 'Issuer',
+        title: '발급자 콘솔',
         badge: '운영 콘솔',
         copy: '발급자 로그, 시뮬레이터, 통계를 확인하며 신뢰 패스 발급 흐름을 점검합니다.'
       }
@@ -55,8 +55,8 @@ const launcherCopy = {
   },
   en: {
     eyebrow: 'NomokDon MVP launcher',
-    title: 'Jump to the surface you need.',
-    copy: 'NomokDon is split into tenant trust pass, landlord verification, and issuer operations. Each surface opens through its own Vite entry.',
+    title: 'Show trust before cash becomes the barrier.',
+    copy: 'NomokDon helps foreign residents prepare housing trust evidence and lets landlords review it without raw private records.',
     surfaces: {
       tenant: {
         title: 'Tenant',
@@ -78,7 +78,14 @@ const launcherCopy = {
 } as const;
 
 function getInitialLocale(): Locale {
-  return normalizeLocale(getSession()?.locale ?? navigator.language);
+  return getLocalePreference(getSession()?.locale ?? navigator.language);
+}
+
+function createHeaderActions(locale: Locale, onChange: (nextLocale: Locale) => void): HTMLDivElement {
+  const actions = document.createElement('div');
+  actions.className = 'route-header-actions';
+  actions.append(createLocaleToggle(locale, onChange));
+  return actions;
 }
 
 function createLocaleToggle(locale: Locale, onChange: (nextLocale: Locale) => void): HTMLDivElement {
@@ -115,8 +122,6 @@ function createFeatureRow(locale: Locale): HTMLDivElement {
 
 function createLauncherLink(routeKey: AppRouteKey, locale: Locale): HTMLAnchorElement {
   const copy = launcherCopy[locale].surfaces[routeKey];
-  const route = routeIa[routeKey];
-  const pathLabel = routeKey === 'tenant' ? launcherHrefByRouteKey[routeKey] : 'pathPattern' in route ? route.pathPattern : route.path;
 
   const link = document.createElement('a');
   link.className = 'route-launcher-link';
@@ -135,16 +140,12 @@ function createLauncherLink(routeKey: AppRouteKey, locale: Locale): HTMLAnchorEl
   description.className = 'route-launcher-link__copy';
   description.textContent = copy.copy;
 
-  const meta = document.createElement('span');
-  meta.className = 'route-launcher-link__meta';
-  meta.textContent = `${pathLabel} · ${route.label}`;
-
   const arrow = document.createElement('span');
   arrow.className = 'route-launcher-link__arrow';
   arrow.setAttribute('aria-hidden', 'true');
   arrow.textContent = '↗';
 
-  link.append(header, description, meta, arrow);
+  link.append(header, description, arrow);
   return link;
 }
 
@@ -177,7 +178,7 @@ function renderRootLauncher(root: HTMLElement, locale: Locale, onChange: (nextLo
   title.textContent = copy.title;
 
   titleGroup.append(eyebrow, title);
-  header.append(titleGroup, createLocaleToggle(locale, onChange));
+  header.append(titleGroup, createHeaderActions(locale, onChange));
 
   const description = document.createElement('p');
   description.className = 'copy route-launcher-copy';
@@ -228,7 +229,7 @@ function renderPlaceholder(root: HTMLElement, routeKey: AppRouteKey, locale: Loc
   title.textContent = t(copyKeys.title, locale);
 
   titleGroup.append(eyebrow, title);
-  header.append(titleGroup, createLocaleToggle(locale, onChange));
+  header.append(titleGroup, createHeaderActions(locale, onChange));
 
   const copy = document.createElement('p');
   copy.className = 'copy';
@@ -272,7 +273,7 @@ export function mountAppPlaceholder(root: HTMLElement, routeKey: AppRouteKey): v
 
   const render = () => {
     renderPlaceholder(root, routeKey, locale, (nextLocale) => {
-      locale = nextLocale;
+      locale = setLocalePreference(nextLocale);
       render();
     });
   };
@@ -285,7 +286,7 @@ export function mountRootLauncher(root: HTMLElement): void {
 
   const render = () => {
     renderRootLauncher(root, locale, (nextLocale) => {
-      locale = nextLocale;
+      locale = setLocalePreference(nextLocale);
       render();
     });
   };
