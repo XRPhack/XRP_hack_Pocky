@@ -23,12 +23,12 @@ describe('xrplCredential', () => {
     submitAndWaitMock.mockClear();
   });
 
-  it('exports only the two MVP credential types', () => {
+  it('exports the supported MVP credential types', () => {
     expect(SUPPORTED_CREDENTIAL_TYPES).toEqual([
       'nomokdon-visa',
+      'nomokdon-employment',
       'nomokdon-rent-reputation'
     ]);
-    expect(SUPPORTED_CREDENTIAL_TYPES).not.toContain('nomokdon-employment');
   });
 
   it('builds a CredentialCreate draft with hex fields and Ripple expiration', () => {
@@ -87,8 +87,8 @@ describe('xrplCredential', () => {
     ).toThrow('CredentialType must be 64 bytes or fewer before hex encoding');
   });
 
-  it('explicitly rejects unsupported employment credentials in this MVP', () => {
-    expect(() =>
+  it('builds employment CredentialCreate drafts', () => {
+    expect(
       buildCredentialCreate({
         issuer: 'rISSUER',
         subject: 'rTENANT',
@@ -96,7 +96,14 @@ describe('xrplCredential', () => {
         uri: 'https://nomokdon.app/vc/employment.json',
         expiration: '2027-06-30T00:00:00.000Z'
       })
-    ).toThrow('Unsupported CredentialType: nomokdon-employment');
+    ).toEqual({
+      TransactionType: 'CredentialCreate',
+      Account: 'rISSUER',
+      Subject: 'rTENANT',
+      CredentialType: hexEncode('nomokdon-employment'),
+      URI: hexEncode('https://nomokdon.app/vc/employment.json'),
+      Expiration: isoTimeToRippleTime('2027-06-30T00:00:00.000Z')
+    });
   });
 
   it('submits CredentialCreate through the shared submitAndWait wrapper', async () => {

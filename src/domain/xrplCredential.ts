@@ -5,6 +5,7 @@ import { hexEncode, isoTimeToRippleTime } from './xrplEncoding.js';
 
 export const SUPPORTED_CREDENTIAL_TYPES = [
   'nomokdon-visa',
+  'nomokdon-employment',
   'nomokdon-rent-reputation'
 ] as const;
 

@@ -116,6 +116,12 @@ type StoredVerifiableCredential = {
   }>;
 };
 
+type CredentialDescriptor = {
+  id: string;
+  type: string;
+  uri: string;
+};
+
 type DocumentVerificationRecord = {
   sessionId: string;
   subjectId: string;
@@ -773,7 +779,28 @@ function createVerifiableCredential({
         : undefined,
       reportId
     },
-    evidence
+  evidence
+  };
+}
+
+function createCredentialDescriptors(requestedCredentialId: string): {
+  visa: CredentialDescriptor;
+  employment: CredentialDescriptor;
+} {
+  const visaId = requestedCredentialId;
+  const employmentId = `${requestedCredentialId}_employment`;
+
+  return {
+    visa: {
+      id: visaId,
+      type: 'nomokdon-visa',
+      uri: `https://nomokdon.app/vc/${visaId}.json`
+    },
+    employment: {
+      id: employmentId,
+      type: 'nomokdon-employment',
+      uri: `https://nomokdon.app/vc/${employmentId}.json`
+    }
   };
 }
 
@@ -952,7 +979,6 @@ async function handleSignAndSubmit(request: IncomingMessage, response: ServerRes
   }
 
   const issuerConfig = resolveIssuerConfig(process.env);
-  const credentialType = normalizeString(body.credentialType) ?? 'nomokdon-visa';
   const reportId = isVcEncryptionConfigured() ? createId(REPORT_ID_PREFIX) : normalizeString(body.reportId) ?? createId(REPORT_ID_PREFIX);
   const credentialId = normalizeString(body.credentialId) ?? `vc_${reportId}`;
   const purpose = normalizeString(body.purpose) ?? 'nomokdon-housing-trust-pass';
@@ -962,6 +988,7 @@ async function handleSignAndSubmit(request: IncomingMessage, response: ServerRes
   const dryRunRequested = body.dryRun !== false;
   const issuedAt = nowIso();
   const documentVerification = sessionId ? documentVerificationsBySessionId.get(sessionId) : undefined;
+  const credentials = createCredentialDescriptors(credentialId);
   const expiration =
     normalizeString(body.expiration) ??
     (documentVerification?.visa?.success ? documentVerification.visa.data.expiresAt : undefined) ??
@@ -981,14 +1008,26 @@ async function handleSignAndSubmit(request: IncomingMessage, response: ServerRes
   const credentialCreate = buildCredentialCreate({
     issuer: issuerConfig.issuerAddress,
     subject: tenantAddress,
-    type: credentialType,
-    uri: `https://nomokdon.app/vc/${credentialId}.json`,
+    type: credentials.visa.type,
+    uri: credentials.visa.uri,
     expiration
   });
   const credentialAccept = buildCredentialAccept({
     tenant: tenantAddress,
     issuer: issuerConfig.issuerAddress,
-    type: credentialType
+    type: credentials.visa.type
+  });
+  const employmentCredentialCreate = buildCredentialCreate({
+    issuer: issuerConfig.issuerAddress,
+    subject: tenantAddress,
+    type: credentials.employment.type,
+    uri: credentials.employment.uri,
+    expiration
+  });
+  const employmentCredentialAccept = buildCredentialAccept({
+    tenant: tenantAddress,
+    issuer: issuerConfig.issuerAddress,
+    type: credentials.employment.type
   });
   const rentPayment = await buildRentPayment({
     tenant: tenantAddress,
@@ -1034,7 +1073,10 @@ async function handleSignAndSubmit(request: IncomingMessage, response: ServerRes
       employmentStatus,
       monthlyIncomeKrw,
       monthlyRentKrw,
-      credentials: [{ type: credentialType, status: 'pass', credentialId }],
+      credentials: [
+        { type: 'visa', status: visaStatus, credentialId: credentials.visa.id },
+        { type: 'employment', status: employmentStatus, credentialId: credentials.employment.id }
+      ],
       anchors: [escrowDraft.contractHash, ...documentAnchors]
     },
     escrowState: {
@@ -1056,8 +1098,8 @@ async function handleSignAndSubmit(request: IncomingMessage, response: ServerRes
     const txResponse = await submitCreate(liveSubmitWallet, {
       issuer: issuerConfig.issuerAddress,
       subject: tenantAddress,
-      type: credentialType,
-      uri: `https://nomokdon.app/vc/${credentialId}.json`,
+      type: credentials.visa.type,
+      uri: credentials.visa.uri,
       expiration
     }) as { result?: { hash?: unknown; engine_result?: unknown; validated?: unknown } };
 
@@ -1085,17 +1127,31 @@ async function handleSignAndSubmit(request: IncomingMessage, response: ServerRes
     createDidDocument({
       account: tenantAddress,
       did: subjectDid,
-      credentialId,
+      credentialId: credentials.visa.id,
       reportId: report.reportId,
       purpose,
       createdAt: issuedAt
     })
   );
   verifiableCredentialsById.set(
-    credentialId,
+    credentials.visa.id,
     createVerifiableCredential({
-      credentialId,
-      credentialType,
+      credentialId: credentials.visa.id,
+      credentialType: credentials.visa.type,
+      issuer: issuerConfig.issuerAddress,
+      subjectDid,
+      tenantAddress,
+      reportId: report.reportId,
+      expiration,
+      issuedAt,
+      documentVerification
+    })
+  );
+  verifiableCredentialsById.set(
+    credentials.employment.id,
+    createVerifiableCredential({
+      credentialId: credentials.employment.id,
+      credentialType: credentials.employment.type,
       issuer: issuerConfig.issuerAddress,
       subjectDid,
       tenantAddress,
@@ -1118,7 +1174,7 @@ async function handleSignAndSubmit(request: IncomingMessage, response: ServerRes
       issuerAddress: issuerConfig.issuerAddress,
       tenantWalletAddress: tenantAddress,
       escrowAmountXrp: escrowDraft.amountXrp,
-      credentialType,
+      credentialTypes: [credentials.visa.type, credentials.employment.type],
       documentVerification: documentVerification
         ? {
             visa: documentVerification.visa
@@ -1144,6 +1200,8 @@ async function handleSignAndSubmit(request: IncomingMessage, response: ServerRes
       didSet,
       credentialCreate,
       credentialAccept,
+      employmentCredentialCreate,
+      employmentCredentialAccept,
       rentPayment,
       escrowCreate: escrowDraft.createTx
     },

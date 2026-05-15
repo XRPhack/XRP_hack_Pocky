@@ -399,6 +399,13 @@ describe('mini Node API', () => {
     });
     expect(sign.json.reportId).toMatch(/^report_/);
     expect(sign.text).toContain('CredentialCreate');
+    expect(sign.json.drafts).toMatchObject({
+      credentialCreate: expect.objectContaining({ TransactionType: 'CredentialCreate' }),
+      credentialAccept: expect.objectContaining({ TransactionType: 'CredentialAccept' }),
+      employmentCredentialCreate: expect.objectContaining({ TransactionType: 'CredentialCreate' }),
+      employmentCredentialAccept: expect.objectContaining({ TransactionType: 'CredentialAccept' })
+    });
+    expect(JSON.stringify(sign.json.drafts)).toContain('6E6F6D6F6B646F6E2D656D706C6F796D656E74');
     expect(sign.text).not.toContain('tx_blob');
     expectNoSecrets(sign.text, [issuerSeed, leakedRequestSeed, leakedRequestSecret, leakedPrivateKey, leakedTxBlob]);
 
@@ -533,6 +540,23 @@ describe('mini Node API', () => {
     const credential = vc.json.credential as { evidence: unknown[] };
     expect(credential.evidence).toHaveLength(2);
     expectNoSecrets(vc.text, [rawForeignRegistrationNumber, organizationName]);
+
+    const employmentCredentialId = `${credentialId}_employment`;
+    const employmentVc = await apiFetch(`/api/vc/${encodeURIComponent(employmentCredentialId)}`);
+
+    expect(employmentVc.response.status).toBe(200);
+    expect(employmentVc.json.credential).toMatchObject({
+      id: employmentCredentialId,
+      type: ['VerifiableCredential', 'nomokdon-employment'],
+      credentialSubject: {
+        id: `did:xrpl:testnet:${tenantWalletAddress}`,
+        employment: expect.objectContaining({
+          verified: true,
+          channel: 'school'
+        })
+      }
+    });
+    expectNoSecrets(employmentVc.text, [rawForeignRegistrationNumber, organizationName]);
   });
 
   it('encrypts the in-memory report store and preserves report API responses when configured', async () => {
