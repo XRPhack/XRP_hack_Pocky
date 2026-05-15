@@ -1,9 +1,11 @@
 import type { AdapterResult, VerificationAdapter } from './adapter.interface.js';
 import {
   createUploadedDocumentHash,
+  extractUploadedDocumentText,
   getLast4,
   hashOptionalString,
-  parseUploadedJsonDocument
+  parseUploadedJsonDocument,
+  parseVisaDocumentText
 } from './document-parsing.js';
 import type {
   UploadedDocumentInput,
@@ -40,7 +42,10 @@ export const visaDocumentAdapter: VerificationAdapter<
   id: 'uploaded-visa-document',
   name: 'Uploaded visa document adapter',
   async verify(input): Promise<AdapterResult<UploadedVisaVerificationData>> {
-    const parsed = parseUploadedJsonDocument<UploadedVisaDocument>(input.document);
+    const extracted = extractUploadedDocumentText(input.document);
+    const parsed = extracted.extractionMode === 'json'
+      ? parseUploadedJsonDocument<UploadedVisaDocument>(input.document)
+      : parseVisaDocumentText(extracted.text);
     const now = input.now ?? new Date().toISOString();
     const visaType = normalizeString(parsed.visaType) ?? 'unknown';
     const nationality = normalizeString(parsed.nationality) ?? 'unknown';

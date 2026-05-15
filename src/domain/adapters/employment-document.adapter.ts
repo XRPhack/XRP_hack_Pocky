@@ -1,7 +1,9 @@
 import type { AdapterResult, VerificationAdapter } from './adapter.interface.js';
 import {
   createUploadedDocumentHash,
+  extractUploadedDocumentText,
   hashOptionalString,
+  parseEmploymentDocumentText,
   parseUploadedJsonDocument
 } from './document-parsing.js';
 import type {
@@ -58,7 +60,10 @@ export const employmentDocumentAdapter: VerificationAdapter<
   id: 'uploaded-employment-document',
   name: 'Uploaded employment document adapter',
   async verify(input): Promise<AdapterResult<UploadedEmploymentVerificationData>> {
-    const parsed = parseUploadedJsonDocument<UploadedEmploymentDocument>(input.document);
+    const extracted = extractUploadedDocumentText(input.document);
+    const parsed = extracted.extractionMode === 'json'
+      ? parseUploadedJsonDocument<UploadedEmploymentDocument>(input.document)
+      : parseEmploymentDocumentText(extracted.text);
     const now = input.now ?? new Date().toISOString();
     const status = resolveStatus(parsed, now);
 

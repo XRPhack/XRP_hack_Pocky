@@ -34,6 +34,11 @@ export type UploadedEmploymentDocument = {
   issuer?: string;
 };
 
+export type ExtractedDocumentText = {
+  text: string;
+  extractionMode: 'json' | 'plain-text' | 'pdf-text-lite';
+};
+
 export type UploadedVisaVerificationData = {
   subjectId: string;
   visaType: string;
