@@ -25,6 +25,8 @@ Issuer console은 발표자가 evidence 상태를 보여주는 운영자 화면�
 
 문서 업로드 기반 비자/고용 검증은 `POST /api/verification-documents`에서 처리합니다. API 요청/응답, `reviewReasons`, `retention`, `authenticity`, 감사 로그 계약은 `docs/document-verification-api.md`를 기준으로 설명합니다.
 
+스캔 PDF나 이미지처럼 자동 파싱이 어려운 문서는 현재 실제 OCR을 수행하지 않고 수동검토 ticket만 생성합니다. 이 확장 지점은 `src/domain/adapters/document-review.ts`의 `DocumentReviewQueueAdapter`로 분리되어 있어, 추후 OCR 또는 운영자 승인 큐를 연결할 때 원문을 API 응답에 노출하지 않는 방식으로 교체할 수 있습니다.
+
 ## 3. XRPL 범위
 
 현재 MVP는 XRPL Testnet evidence를 중심으로 합니다. DIDSet, CredentialCreate/Accept, Payment memo, Escrow 관련 데이터는 데모 fixture와 도메인 모듈에서 생성됩니다.

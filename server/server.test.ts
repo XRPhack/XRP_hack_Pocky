@@ -664,8 +664,25 @@ describe('mini Node API', () => {
       ok: true,
       status: 'review-needed',
       reviewReasons: expect.arrayContaining([
-        expect.objectContaining({ kind: 'visa', code: 'parse-failed' }),
-        expect.objectContaining({ kind: 'employment', code: 'authenticity-missing' })
+        expect.objectContaining({
+          kind: 'visa',
+          code: 'parse-failed',
+          manualReview: expect.objectContaining({
+            status: 'not-configured',
+            queue: 'ocr',
+            reasonCode: 'parse-failed',
+            documentHash: expect.stringMatching(/^[a-f0-9]{64}$/)
+          })
+        }),
+        expect.objectContaining({
+          kind: 'employment',
+          code: 'authenticity-missing',
+          manualReview: expect.objectContaining({
+            status: 'not-configured',
+            queue: 'manual-review',
+            reasonCode: 'authenticity-missing'
+          })
+        })
       ]),
       employment: expect.objectContaining({
         success: true,

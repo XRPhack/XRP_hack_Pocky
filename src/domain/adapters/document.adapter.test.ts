@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { employmentDocumentAdapter } from './employment-document.adapter';
+import { createManualReviewTicket, noopDocumentReviewQueueAdapter } from './document-review';
 import { visaDocumentAdapter } from './visa-document.adapter';
 
 function asBase64Json(value: unknown): string {
@@ -170,5 +171,41 @@ describe('uploaded document adapters', () => {
     });
     expect(JSON.stringify(result)).not.toContain('Seoul Mobility Parts');
     expect(JSON.stringify(result)).not.toContain('EI-2026-PDF');
+  });
+
+  it('creates safe manual-review tickets for OCR extension points', async () => {
+    const rawImageText = 'raw image bytes with document code MOJ-SECRET';
+    const document = {
+      filename: 'visa-scan.png',
+      mimeType: 'image/png',
+      base64: Buffer.from(rawImageText, 'utf8').toString('base64')
+    } as const;
+    const ticket = await createManualReviewTicket({
+      kind: 'visa',
+      reasonCode: 'parse-failed',
+      document,
+      createdAt: '2026-05-15T00:00:00.000Z',
+      summary: 'Image requires OCR.'
+    });
+    const noopTicket = await noopDocumentReviewQueueAdapter.enqueue({
+      kind: 'visa',
+      reasonCode: 'parse-failed',
+      document,
+      createdAt: '2026-05-15T00:00:00.000Z',
+      summary: 'Image requires OCR.'
+    });
+
+    expect(ticket).toMatchObject({
+      kind: 'visa',
+      status: 'queued',
+      queue: 'ocr',
+      reasonCode: 'parse-failed',
+      summary: 'Image requires OCR.'
+    });
+    expect(ticket.id).toMatch(/^[a-f0-9]{24}$/);
+    expect(ticket.documentHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(noopTicket.status).toBe('not-configured');
+    expect(JSON.stringify(ticket)).not.toContain(rawImageText);
+    expect(JSON.stringify(noopTicket)).not.toContain(rawImageText);
   });
 });

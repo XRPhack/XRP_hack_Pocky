@@ -12,6 +12,11 @@ import type {
   UploadedEmploymentVerificationData,
   UploadedVisaVerificationData
 } from '../src/domain/adapters/document.types.js';
+import {
+  noopDocumentReviewQueueAdapter,
+  type DocumentManualReviewReasonCode,
+  type DocumentManualReviewTicket
+} from '../src/domain/adapters/document-review.js';
 import { rentLedgerEdgeCase, rentLedgerHappyCase } from '../src/domain/adapters/rent-ledger.fixture.js';
 import { visaEdgeCase, visaHappyCase } from '../src/domain/adapters/visa.fixture.js';
 import { visaDocumentAdapter } from '../src/domain/adapters/visa-document.adapter.js';
@@ -149,10 +154,11 @@ type DocumentVerificationRecord = {
 
 type DocumentReviewReason = {
   kind: 'visa' | 'employment';
-  code: 'parse-failed' | 'verification-failed' | 'authenticity-missing';
+  code: DocumentManualReviewReasonCode;
   title: string;
   message: string;
   action: string;
+  manualReview?: DocumentManualReviewTicket;
 };
 
 type IssuerConfig = {
@@ -914,20 +920,36 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Document could not be parsed.';
 }
 
-function createDocumentParseReviewReason(kind: 'visa' | 'employment', error: unknown): DocumentReviewReason {
+async function createDocumentParseReviewReason(
+  kind: 'visa' | 'employment',
+  error: unknown,
+  document: UploadedDocumentPayload,
+  createdAt: string
+): Promise<DocumentReviewReason> {
+  const message = errorMessage(error);
+
   return {
     kind,
     code: 'parse-failed',
     title: kind === 'visa' ? 'Visa document could not be read.' : 'Employment or school document could not be read.',
-    message: errorMessage(error),
-    action: 'Upload JSON, plain text, or a text-based PDF. Scanned images and image-only PDFs need manual review or OCR first.'
+    message,
+    action: 'Upload JSON, plain text, or a text-based PDF. Scanned images and image-only PDFs need manual review or OCR first.',
+    manualReview: await noopDocumentReviewQueueAdapter.enqueue({
+      kind,
+      reasonCode: 'parse-failed',
+      document,
+      createdAt,
+      summary: message
+    })
   };
 }
 
 function createDocumentResultReviewReasons(
   kind: 'visa' | 'employment',
-  result: NonNullable<DocumentVerificationRecord['visa'] | DocumentVerificationRecord['employment']>
-): DocumentReviewReason[] {
+  result: NonNullable<DocumentVerificationRecord['visa'] | DocumentVerificationRecord['employment']>,
+  document: UploadedDocumentPayload,
+  createdAt: string
+): Promise<DocumentReviewReason[]> {
   const reasons: DocumentReviewReason[] = [];
 
   if (!result.success) {
@@ -952,7 +974,16 @@ function createDocumentResultReviewReasons(
     });
   }
 
-  return reasons;
+  return Promise.all(reasons.map(async (reason) => ({
+    ...reason,
+    manualReview: await noopDocumentReviewQueueAdapter.enqueue({
+      kind,
+      reasonCode: reason.code,
+      document,
+      createdAt,
+      summary: reason.message
+    })
+  })));
 }
 
 async function handleHealth(response: ServerResponse): Promise<void> {
@@ -1089,9 +1120,9 @@ async function handleVerificationDocuments(
         data: result.data,
         message: result.message
       };
-      reviewReasons.push(...createDocumentResultReviewReasons('visa', record.visa));
+      reviewReasons.push(...await createDocumentResultReviewReasons('visa', record.visa, visaDocument, createdAt));
     } catch (error) {
-      reviewReasons.push(createDocumentParseReviewReason('visa', error));
+      reviewReasons.push(await createDocumentParseReviewReason('visa', error, visaDocument, createdAt));
     }
   }
 
@@ -1111,9 +1142,9 @@ async function handleVerificationDocuments(
         data: result.data,
         message: result.message
       };
-      reviewReasons.push(...createDocumentResultReviewReasons('employment', record.employment));
+      reviewReasons.push(...await createDocumentResultReviewReasons('employment', record.employment, employmentDocument, createdAt));
     } catch (error) {
-      reviewReasons.push(createDocumentParseReviewReason('employment', error));
+      reviewReasons.push(await createDocumentParseReviewReason('employment', error, employmentDocument, createdAt));
     }
   }
 

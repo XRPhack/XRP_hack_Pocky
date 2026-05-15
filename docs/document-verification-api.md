@@ -210,7 +210,17 @@ The API returns `201` even when the upload needs review because the upload was a
       "code": "parse-failed",
       "title": "Visa document could not be read.",
       "message": "Only JSON, text, or text-based PDF documents are supported in this MVP.",
-      "action": "Upload JSON, plain text, or a text-based PDF. Scanned images and image-only PDFs need manual review or OCR first."
+      "action": "Upload JSON, plain text, or a text-based PDF. Scanned images and image-only PDFs need manual review or OCR first.",
+      "manualReview": {
+        "id": "0d2f3d7f9f7d63c1b60e218f",
+        "kind": "visa",
+        "status": "not-configured",
+        "queue": "ocr",
+        "reasonCode": "parse-failed",
+        "documentHash": "hash...",
+        "createdAt": "2026-05-15T14:00:00.000Z",
+        "summary": "Only JSON, text, or text-based PDF documents are supported in this MVP."
+      }
     },
     {
       "kind": "employment",
@@ -230,6 +240,40 @@ Review reason codes:
 | `parse-failed` | The file could not be parsed. Common for images or image-only PDFs. | Upload JSON, plain text, or text-based PDF, or route to OCR/manual review. |
 | `verification-failed` | Parsed fields did not satisfy business rules. | Upload a current visa or active employment/school evidence. |
 | `authenticity-missing` | No document verification code, issue number, or QR verification URL was found. | Upload a version that includes a verification code or QR URL. |
+
+## OCR and Manual Review Extension Point
+
+The current MVP does not run OCR or provide an operator approval queue. Instead, each review reason can include a safe `manualReview` ticket that future OCR/manual-review adapters can consume.
+
+```json
+{
+  "id": "0d2f3d7f9f7d63c1b60e218f",
+  "kind": "visa",
+  "status": "not-configured",
+  "queue": "ocr",
+  "reasonCode": "parse-failed",
+  "documentHash": "hash...",
+  "createdAt": "2026-05-15T14:00:00.000Z",
+  "summary": "PDF text could not be extracted without an OCR/PDF parser."
+}
+```
+
+Ticket fields:
+
+| Field | Values |
+| --- | --- |
+| `status` | `not-configured` in the local MVP, `queued` for a real queue adapter |
+| `queue` | `ocr` for PDF/image candidates, `manual-review` for business-rule or authenticity review |
+| `reasonCode` | Same code as the parent review reason |
+
+The extension interface lives in `src/domain/adapters/document-review.ts`:
+
+- `DocumentReviewQueueAdapter`
+- `DocumentManualReviewRequest`
+- `DocumentManualReviewTicket`
+- `noopDocumentReviewQueueAdapter`
+
+A production OCR or operations queue should implement `DocumentReviewQueueAdapter.enqueue`. The adapter must store uploaded originals outside this API response and return only a safe ticket id, queue metadata, reason code, and document hash. Raw document text, image bytes, QR URLs, and verification codes must not appear in the ticket.
 
 ## Authenticity Object
 
