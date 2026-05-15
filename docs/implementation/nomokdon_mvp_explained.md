@@ -17,7 +17,7 @@
 
 임차인은 mock Toss 로그인으로 시작합니다. 앱은 여권번호, 전화번호, seed, private key를 저장하지 않는다는 안내를 먼저 보여줍니다.
 
-그다음 3단계 wizard에서 공개 DID, 비자 credential, 월세 평판 credential, 예약금 보호 evidence를 확인합니다. 정상 fixture에서는 Trust Grade와 여섯 개 배지가 만들어지고, edge fixture에서는 만료된 비자 때문에 pass 생성이 막힙니다.
+그다음 4단계 wizard에서 공개 DID, 문서 업로드 검증, 비자/고용 credential, 예약금 보호 evidence를 확인합니다. 정상 fixture에서는 Trust Grade와 여섯 개 배지가 만들어지고, edge fixture에서는 만료된 비자 때문에 pass 생성이 막힙니다.
 
 대시보드에서는 공유 링크와 QR을 제공합니다. 임대인은 `/verify/report_*`에서 리포트를 확인하고, 확인 버튼을 눌러 검증 상태를 기록합니다.
 
@@ -79,8 +79,9 @@ docs/demo-video.mp4
 2. 만료된 비자는 pass 생성을 막습니다.
 3. 검증 배지는 입력 evidence에서 계산됩니다.
 4. 공개 verify page는 임대인용 리포트 상태를 따로 보여줍니다.
-5. Issuer console은 evidence 로그와 fixture 상태를 따로 보여줍니다.
-6. Playwright e2e와 unit test가 tenant, verify, issuer 흐름을 검증합니다.
+5. 문서 업로드 검증은 진위확인 상태, 수동검토 사유, TTL, 감사 로그를 분리해 보여줍니다.
+6. Issuer console은 evidence 로그와 fixture 상태를 따로 보여줍니다.
+7. Playwright e2e와 unit test가 tenant, verify, issuer 흐름을 검증합니다.
 
 ## 7. 실행 방법
 

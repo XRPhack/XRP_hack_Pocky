@@ -129,6 +129,7 @@ Run these from the repository root.
 git status --short --untracked-files=all
 npm test
 npm run build
+npm run test:e2e
 ```
 
 Expected results:
@@ -158,18 +159,25 @@ Check manually:
 
 1. Tenant mock Toss login starts from `/tenant/`.
 2. Onboarding advances through all steps.
-3. Happy fixture creates a trust pass and dashboard.
-4. Toss unlock screen appears from the dashboard.
-5. Share/QR opens a verify report link.
-6. Verify page shows Trust Grade, six badges, and Testnet links.
-7. Issuer page asks for a password if `ISSUER_CONSOLE_PASSWORD` is configured.
-8. Issuer simulator/logs work after login.
+3. Happy fixture creates a DID, verifies documents, issues credentials, locks escrow, and opens the dashboard.
+4. Document step shows authenticity-ready status and retention copy.
+5. Toss unlock screen appears from the dashboard.
+6. Share/QR opens a verify report link.
+7. Verify page shows Trust Grade, six badges, document authenticity, and Testnet links.
+8. Issuer page asks for a password if `ISSUER_CONSOLE_PASSWORD` is configured.
+9. Issuer simulator/logs work after login, including `document.verification` audit events after a tenant run.
 
 ### E2E checks
 
 ```bash
 npm run test:e2e:happy
 npm run test:e2e:edge
+```
+
+Or run both:
+
+```bash
+npm run test:e2e
 ```
 
 Expected results:
