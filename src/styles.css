@@ -1169,6 +1169,30 @@ body {
   line-height: var(--line-height-copy);
 }
 
+.tenant-wizard-document-upload__feedback {
+  overflow-wrap: anywhere;
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width-hairline) solid var(--color-neutral-100);
+  border-radius: var(--radius-md);
+  background: var(--color-neutral-50-alpha-88);
+  color: var(--color-neutral-700);
+  font-size: var(--font-size-caption);
+  font-weight: 800;
+  line-height: var(--line-height-copy);
+}
+
+.tenant-wizard-document-upload__feedback--warning {
+  border-color: var(--color-warning-border);
+  background: var(--color-warning-background);
+  color: var(--color-warning-text);
+}
+
+.tenant-wizard-document-upload__feedback--error {
+  border-color: var(--color-error-border);
+  background: var(--color-error-background);
+  color: var(--color-error-text);
+}
+
 .tenant-wizard-document-upload__remove {
   justify-self: start;
   padding: var(--space-2) var(--space-3);

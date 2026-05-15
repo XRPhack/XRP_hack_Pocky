@@ -27,6 +27,11 @@ export type WizardDocumentRetention = {
   replacedPrevious: boolean;
 };
 
+export type WizardDocumentFileFeedback = {
+  variant: 'info' | 'warning' | 'error';
+  message: string;
+};
+
 type WizardDocumentVerificationResult = {
   success: boolean;
   source: string;
@@ -59,6 +64,10 @@ type WizardScreenProps = {
   selectedDocumentNames: {
     visa?: string;
     employment?: string;
+  };
+  documentFileFeedback: {
+    visa?: WizardDocumentFileFeedback;
+    employment?: WizardDocumentFileFeedback;
   };
   documentVerification?: WizardDocumentVerificationSummary;
   localeToggle: UiChild;
@@ -207,6 +216,7 @@ function createDocumentUploadControls(
   isActive: boolean,
   locale: Locale,
   selectedDocumentNames: WizardScreenProps['selectedDocumentNames'],
+  documentFileFeedback: WizardScreenProps['documentFileFeedback'],
   onDocumentChange: WizardScreenProps['onDocumentChange'],
   onDocumentRemove: WizardScreenProps['onDocumentRemove']
 ): HTMLElement | null {
@@ -224,7 +234,7 @@ function createDocumentUploadControls(
     const input = document.createElement('input');
     input.className = 'tenant-wizard-document-upload__input';
     input.type = 'file';
-    input.accept = '.json,.txt,application/json,text/plain';
+    input.accept = '.json,.txt,.pdf,.png,.jpg,.jpeg,application/json,text/plain,application/pdf,image/png,image/jpeg';
     input.addEventListener('change', () => {
       onDocumentChange(kind, input.files?.[0] ?? null);
     });
@@ -237,6 +247,9 @@ function createDocumentUploadControls(
       input.value = '';
       onDocumentRemove(kind);
     });
+    const feedback = documentFileFeedback[kind]
+      ? createDocumentFileFeedback(documentFileFeedback[kind])
+      : null;
 
     appendChildren(
       label,
@@ -251,6 +264,7 @@ function createDocumentUploadControls(
         'tenant-wizard-document-upload__filename',
         selectedDocumentNames[kind] ?? t('tenantWizardDocumentFixtureFallback', locale)
       ),
+      feedback,
       removeButton
     );
     group.appendChild(label);
@@ -264,6 +278,12 @@ function createDocumentUploadControls(
     group
   );
   return wrapper;
+}
+
+function createDocumentFileFeedback(feedback: WizardDocumentFileFeedback): HTMLElement {
+  const element = createTextElement('span', `tenant-wizard-document-upload__feedback tenant-wizard-document-upload__feedback--${feedback.variant}`, feedback.message);
+  element.setAttribute('role', feedback.variant === 'error' ? 'alert' : 'status');
+  return element;
 }
 
 function createDocumentVerificationSummary(
@@ -478,6 +498,7 @@ function createStepCard(
   activeStepIndex: number,
   locale: Locale,
   selectedDocumentNames: WizardScreenProps['selectedDocumentNames'],
+  documentFileFeedback: WizardScreenProps['documentFileFeedback'],
   documentVerification: WizardScreenProps['documentVerification'],
   onDocumentChange: WizardScreenProps['onDocumentChange'],
   onDocumentRemove: WizardScreenProps['onDocumentRemove'],
@@ -501,7 +522,7 @@ function createStepCard(
         : null,
       createCredentialFallbackGuide(stepIndex, step, locale),
       createDocumentVerificationSummary(stepIndex, documentVerification, locale),
-      createDocumentUploadControls(stepIndex, step.status, isActive, locale, selectedDocumentNames, onDocumentChange, onDocumentRemove),
+      createDocumentUploadControls(stepIndex, step.status, isActive, locale, selectedDocumentNames, documentFileFeedback, onDocumentChange, onDocumentRemove),
       createStepAction(stepIndex, step.status, isActive, locale, onRunStep)
     ],
     elevated: isActive
@@ -544,6 +565,7 @@ export function WizardScreen({
   selectedFixtureId,
   isFixtureLocked,
   selectedDocumentNames,
+  documentFileFeedback,
   documentVerification,
   localeToggle,
   onFixtureChange,
@@ -559,6 +581,7 @@ export function WizardScreen({
       activeStepIndex,
       normalizedLocale,
       selectedDocumentNames,
+      documentFileFeedback,
       documentVerification,
       onDocumentChange,
       onDocumentRemove,

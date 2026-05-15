@@ -20,6 +20,7 @@ import {
   type LoginStatus,
   type TenantWizardFixtureId,
   type WizardDocumentAuthenticity,
+  type WizardDocumentFileFeedback,
   type WizardDocumentRetention,
   type WizardDocumentReviewReason,
   type WizardDocumentVerificationSummary,
@@ -47,6 +48,10 @@ type TenantState = {
   documentFiles: {
     visa?: File;
     employment?: File;
+  };
+  documentFileFeedback: {
+    visa?: WizardDocumentFileFeedback;
+    employment?: WizardDocumentFileFeedback;
   };
   documentVerification?: WizardDocumentVerificationSummary;
   reportBadges: string[];
@@ -76,8 +81,19 @@ const state: TenantState = {
   wizardStepIndex: 0,
   wizardSteps: createWizardStepStates(),
   documentFiles: {},
+  documentFileFeedback: {},
   reportBadges: []
 };
+
+const MAX_DOCUMENT_FILE_BYTES = 5 * 1024 * 1024;
+const supportedDocumentMimeTypes = new Set([
+  'application/json',
+  'text/plain',
+  'application/pdf',
+  'image/png',
+  'image/jpeg'
+]);
+const supportedDocumentExtensions = ['.json', '.txt', '.pdf', '.png', '.jpg', '.jpeg'] as const;
 
 class WizardStepError extends Error {
   constructor(
@@ -203,6 +219,7 @@ function showOnboarding(): void {
   state.wizardStepIndex = 0;
   state.wizardSteps = createWizardStepStates();
   state.documentFiles = {};
+  state.documentFileFeedback = {};
   state.documentVerification = undefined;
   clearDashboardReport();
   render();
@@ -214,6 +231,7 @@ function showWizard(): void {
   state.wizardStepIndex = 0;
   state.wizardSteps = createWizardStepStates();
   state.documentFiles = {};
+  state.documentFileFeedback = {};
   state.documentVerification = undefined;
   clearDashboardReport();
   render();
@@ -239,16 +257,105 @@ function setDocumentFile(kind: 'visa' | 'employment', file: File | null): void {
   }
 
   if (file) {
+    const validation = validateDocumentFile(file);
+    const nextFeedback = { ...state.documentFileFeedback };
+
+    nextFeedback[kind] = validation.feedback;
+    state.documentFileFeedback = nextFeedback;
+
+    if (!validation.accepted) {
+      const nextFiles = { ...state.documentFiles };
+      delete nextFiles[kind];
+      state.documentFiles = nextFiles;
+      state.documentVerification = undefined;
+      render();
+      return;
+    }
+
     state.documentFiles = { ...state.documentFiles, [kind]: file };
     state.documentVerification = undefined;
   } else {
     const nextFiles = { ...state.documentFiles };
+    const nextFeedback = { ...state.documentFileFeedback };
     delete nextFiles[kind];
+    delete nextFeedback[kind];
     state.documentFiles = nextFiles;
+    state.documentFileFeedback = nextFeedback;
     state.documentVerification = undefined;
   }
 
   render();
+}
+
+function getDocumentExtension(fileName: string): string {
+  const lower = fileName.toLowerCase();
+  const dotIndex = lower.lastIndexOf('.');
+
+  return dotIndex >= 0 ? lower.slice(dotIndex) : '';
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024 * 1024) {
+    return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  }
+
+  return `${Math.round((bytes / (1024 * 1024)) * 10) / 10} MB`;
+}
+
+function validateDocumentFile(file: File): { accepted: boolean; feedback: WizardDocumentFileFeedback } {
+  const extension = getDocumentExtension(file.name);
+  const hasSupportedType = supportedDocumentMimeTypes.has(file.type);
+  const hasSupportedExtension = supportedDocumentExtensions.includes(extension as (typeof supportedDocumentExtensions)[number]);
+
+  if (file.size > MAX_DOCUMENT_FILE_BYTES) {
+    return {
+      accepted: false,
+      feedback: {
+        variant: 'error',
+        message: t('tenantWizardDocumentFileTooLarge', state.locale)
+          .replace('{maxSize}', formatFileSize(MAX_DOCUMENT_FILE_BYTES))
+          .replace('{fileSize}', formatFileSize(file.size))
+      }
+    };
+  }
+
+  if (!hasSupportedType && !hasSupportedExtension) {
+    return {
+      accepted: false,
+      feedback: {
+        variant: 'error',
+        message: t('tenantWizardDocumentFileUnsupported', state.locale)
+      }
+    };
+  }
+
+  if (file.type === 'image/png' || file.type === 'image/jpeg' || extension === '.png' || extension === '.jpg' || extension === '.jpeg') {
+    return {
+      accepted: true,
+      feedback: {
+        variant: 'warning',
+        message: t('tenantWizardDocumentFileImageWarning', state.locale)
+      }
+    };
+  }
+
+  if (file.type === 'application/pdf' || extension === '.pdf') {
+    return {
+      accepted: true,
+      feedback: {
+        variant: 'warning',
+        message: t('tenantWizardDocumentFilePdfWarning', state.locale)
+      }
+    };
+  }
+
+  return {
+    accepted: true,
+    feedback: {
+      variant: 'info',
+      message: t('tenantWizardDocumentFileReady', state.locale)
+    }
+  };
 }
 
 function removeDocumentFile(kind: 'visa' | 'employment'): void {
@@ -358,6 +465,12 @@ async function createUploadedDocumentPayload(kind: 'visa' | 'employment'): Promi
 
 async function uploadVerificationDocuments(): Promise<void> {
   const session = getSession();
+  const blockingFeedback = Object.values(state.documentFileFeedback).find((feedback) => feedback.variant === 'error');
+
+  if (blockingFeedback) {
+    throw new WizardStepError(t('tenantWizardDocumentReviewTitle', state.locale), blockingFeedback.message);
+  }
+
   const response = await fetch('/api/verification-documents', {
     method: 'POST',
     headers: {
@@ -808,6 +921,7 @@ function render(): void {
           visa: state.documentFiles.visa?.name,
           employment: state.documentFiles.employment?.name
         },
+        documentFileFeedback: state.documentFileFeedback,
         documentVerification: state.documentVerification,
         localeToggle: createHeaderActions(),
         onFixtureChange: selectWizardFixture,

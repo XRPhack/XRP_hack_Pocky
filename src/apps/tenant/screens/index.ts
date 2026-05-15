@@ -6,6 +6,7 @@ export { TossUnlockScreen } from './TossUnlock';
 export {
   WizardScreen,
   type TenantWizardFixtureId,
+  type WizardDocumentFileFeedback,
   type WizardDocumentAuthenticity,
   type WizardDocumentRetention,
   type WizardDocumentReviewReason,
