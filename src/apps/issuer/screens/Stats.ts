@@ -36,7 +36,7 @@ const CHART_PADDING_TOP = 24;
 const CHART_PADDING_BOTTOM = 34;
 const ACTIVITY_BUCKET_COUNT = 8;
 const SIMULATOR_ESCROW_FALLBACK_XRP = 10;
-const inactiveStatuses: readonly IssuerLogEntryStatus[] = ['failed', 'error'];
+const inactiveStatuses: readonly IssuerLogEntryStatus[] = ['failed', 'error', 'expired'];
 
 function getString(value: unknown): string | undefined {
   if (typeof value === 'string' && value.trim()) {

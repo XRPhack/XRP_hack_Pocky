@@ -537,8 +537,13 @@ function getDocumentVerificationForSession(sessionId: string | undefined): Docum
     userId: record.subjectId,
     status: 'expired',
     details: {
+      action: 'document-verification-expired',
       createdAt: record.createdAt,
       expiresAt: record.expiresAt,
+      documentKinds: [
+        record.visa ? 'visa' : undefined,
+        record.employment ? 'employment' : undefined
+      ].filter(Boolean).join(','),
       hadVisa: Boolean(record.visa),
       hadEmployment: Boolean(record.employment)
     }
@@ -1125,12 +1130,20 @@ async function handleVerificationDocuments(
     userId: subjectId,
     status: status === 'verified' ? 'validated' : 'failed',
     details: {
+      action: 'document-verification-upload',
       verificationId: record.sessionId,
       status,
       createdAt,
       expiresAt,
       ttlMs: resolveDocumentVerificationTtlMs(),
+      retentionTtlMinutes: Math.round(resolveDocumentVerificationTtlMs() / 60_000),
       replacedPrevious,
+      documentKinds: [
+        visaDocument ? 'visa' : undefined,
+        employmentDocument ? 'employment' : undefined
+      ].filter(Boolean).join(','),
+      reviewReasonCount: reviewReasons.length,
+      reviewReasons: reviewReasons.map((reason) => reason.code).join(','),
       reviewReasonCodes: reviewReasons.map((reason) => reason.code),
       uploaded: {
         visa: Boolean(visaDocument),
@@ -1447,8 +1460,19 @@ async function handleVerifiableCredential(response: ServerResponse, credentialId
 }
 
 async function handleLogs(response: ServerResponse): Promise<void> {
+  const documentEvents = logEvents.filter((event) => event.type === 'document.verification');
+
   sendJson(response, 200, {
     ok: true,
+    summary: {
+      totalEvents: logEvents.length,
+      documentVerification: {
+        total: documentEvents.length,
+        validated: documentEvents.filter((event) => event.status === 'validated').length,
+        reviewNeeded: documentEvents.filter((event) => event.status === 'failed').length,
+        expired: documentEvents.filter((event) => event.status === 'expired').length
+      }
+    },
     events: logEvents
   });
 }

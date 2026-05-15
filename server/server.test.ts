@@ -297,6 +297,15 @@ describe('mini Node API', () => {
 
     expect(response.status).toBe(200);
     expect(json.ok).toBe(true);
+    expect(json.summary).toMatchObject({
+      totalEvents: 1,
+      documentVerification: {
+        total: 0,
+        validated: 0,
+        reviewNeeded: 0,
+        expired: 0
+      }
+    });
     expect(json.events).toEqual([
       expect.objectContaining({
         id: expect.stringMatching(/^log_/),
@@ -667,6 +676,30 @@ describe('mini Node API', () => {
     });
     expect(upload.text).toContain('Scanned images and image-only PDFs need manual review or OCR first.');
     expect(upload.text).not.toContain('png scan placeholder');
+
+    const logs = await apiFetch('/api/logs');
+    expect(logs.json.summary).toMatchObject({
+      documentVerification: {
+        total: 1,
+        validated: 0,
+        reviewNeeded: 1,
+        expired: 0
+      }
+    });
+    expect(logs.json.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'document.verification',
+        status: 'failed',
+        details: expect.objectContaining({
+          action: 'document-verification-upload',
+          documentKinds: 'visa,employment',
+          reviewReasonCount: 2,
+          reviewReasons: 'parse-failed,authenticity-missing',
+          replacedPrevious: false
+        })
+      })
+    ]));
+    expectNoSecrets(logs.text, ['png scan placeholder']);
   });
 
   it('replaces previous document verification data on re-upload', async () => {
@@ -725,6 +758,26 @@ describe('mini Node API', () => {
       retention: expect.objectContaining({ replacedPrevious: true }),
       visa: expect.objectContaining({ success: true })
     });
+    const logs = await apiFetch('/api/logs');
+    expect(logs.json.summary).toMatchObject({
+      documentVerification: {
+        total: 2,
+        validated: 1,
+        reviewNeeded: 1,
+        expired: 0
+      }
+    });
+    expect(logs.json.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'document.verification',
+        status: 'validated',
+        details: expect.objectContaining({
+          documentKinds: 'visa',
+          replacedPrevious: true,
+          reviewReasonCount: 0
+        })
+      })
+    ]));
 
     const sign = await postJson(
       '/api/sign-and-submit',
@@ -803,6 +856,14 @@ describe('mini Node API', () => {
         })
       })
     ]));
+    expect(logs.json.summary).toMatchObject({
+      documentVerification: {
+        total: 2,
+        validated: 1,
+        reviewNeeded: 0,
+        expired: 1
+      }
+    });
   });
 
   it('encrypts the in-memory report store and preserves report API responses when configured', async () => {
