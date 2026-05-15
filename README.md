@@ -28,6 +28,7 @@ npm run dev
 5. **데모 자료**: `docs/demo-script.md`, `docs/demo-video.mp4`, Playwright evidence, `scripts/demo-fixtures.json`을 사용합니다.
 
 문서 업로드 검증 API 계약은 [`docs/document-verification-api.md`](docs/document-verification-api.md)에 정리되어 있습니다. 지원 파일 형식, `reviewReasons`, `retention`, `authenticity`, 감사 로그 정책을 이 문서 기준으로 확인합니다.
+보안/개인정보 경계와 테스트 범위는 [`docs/security-privacy-checklist.md`](docs/security-privacy-checklist.md)에 정리되어 있습니다.
 
 ## 안전 경계
 

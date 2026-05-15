@@ -627,6 +627,26 @@ describe('mini Node API', () => {
       visaDocumentVerificationCode,
       employmentQrVerificationUrl
     ]);
+
+    const logs = await apiFetch('/api/logs');
+
+    expect(logs.response.status).toBe(200);
+    expect(logs.json.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'document.verification',
+        status: 'validated',
+        details: expect.objectContaining({
+          documentKinds: 'visa,employment',
+          reviewReasonCount: 0
+        })
+      })
+    ]));
+    expectNoSecrets(logs.text, [
+      rawForeignRegistrationNumber,
+      organizationName,
+      visaDocumentVerificationCode,
+      employmentQrVerificationUrl
+    ]);
   });
 
   it('returns structured review reasons when uploaded documents need manual handling', async () => {
@@ -692,7 +712,11 @@ describe('mini Node API', () => {
       })
     });
     expect(upload.text).toContain('Scanned images and image-only PDFs need manual review or OCR first.');
-    expect(upload.text).not.toContain('png scan placeholder');
+    expectNoSecrets(upload.text, [
+      'png scan placeholder',
+      'Busan Technical College',
+      'International Welding Program'
+    ]);
 
     const logs = await apiFetch('/api/logs');
     expect(logs.json.summary).toMatchObject({
@@ -716,7 +740,11 @@ describe('mini Node API', () => {
         })
       })
     ]));
-    expectNoSecrets(logs.text, ['png scan placeholder']);
+    expectNoSecrets(logs.text, [
+      'png scan placeholder',
+      'Busan Technical College',
+      'International Welding Program'
+    ]);
   });
 
   it('replaces previous document verification data on re-upload', async () => {
@@ -795,6 +823,7 @@ describe('mini Node API', () => {
         })
       })
     ]));
+    expectNoSecrets(logs.text, ['MOJ-OLD-DOC', 'MOJ-NEW-DOC']);
 
     const sign = await postJson(
       '/api/sign-and-submit',
@@ -881,6 +910,7 @@ describe('mini Node API', () => {
         expired: 1
       }
     });
+    expectNoSecrets(logs.text, ['MOJ-EXPIRING-DOC']);
   });
 
   it('encrypts the in-memory report store and preserves report API responses when configured', async () => {
