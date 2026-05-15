@@ -13,6 +13,21 @@ type WizardStepState = {
   errorMessage?: string;
 };
 
+export type WizardDocumentVerificationSummary = {
+  visa?: {
+    success: boolean;
+    source: string;
+    evidenceHash: string;
+    summary: string;
+  };
+  employment?: {
+    success: boolean;
+    source: string;
+    evidenceHash: string;
+    summary: string;
+  };
+};
+
 type WizardScreenProps = {
   locale: Locale;
   activeStepIndex: number;
@@ -24,9 +39,11 @@ type WizardScreenProps = {
     visa?: string;
     employment?: string;
   };
+  documentVerification?: WizardDocumentVerificationSummary;
   localeToggle: UiChild;
   onFixtureChange: (fixtureId: TenantWizardFixtureId) => void;
   onDocumentChange: (kind: 'visa' | 'employment', file: File | null) => void;
+  onDocumentRemove: (kind: 'visa' | 'employment') => void;
   onRunStep: (stepIndex: number) => void;
 };
 
@@ -169,7 +186,8 @@ function createDocumentUploadControls(
   isActive: boolean,
   locale: Locale,
   selectedDocumentNames: WizardScreenProps['selectedDocumentNames'],
-  onDocumentChange: WizardScreenProps['onDocumentChange']
+  onDocumentChange: WizardScreenProps['onDocumentChange'],
+  onDocumentRemove: WizardScreenProps['onDocumentRemove']
 ): HTMLElement | null {
   if (stepIndex !== 1 || !isActive || status === 'loading' || status === 'success') {
     return null;
@@ -189,6 +207,15 @@ function createDocumentUploadControls(
     input.addEventListener('change', () => {
       onDocumentChange(kind, input.files?.[0] ?? null);
     });
+    const removeButton = document.createElement('button');
+    removeButton.className = 'tenant-wizard-document-upload__remove';
+    removeButton.type = 'button';
+    removeButton.textContent = t('tenantWizardDocumentRemove', locale);
+    removeButton.disabled = !selectedDocumentNames[kind];
+    removeButton.addEventListener('click', () => {
+      input.value = '';
+      onDocumentRemove(kind);
+    });
 
     appendChildren(
       label,
@@ -202,12 +229,68 @@ function createDocumentUploadControls(
         'span',
         'tenant-wizard-document-upload__filename',
         selectedDocumentNames[kind] ?? t('tenantWizardDocumentFixtureFallback', locale)
-      )
+      ),
+      removeButton
     );
     group.appendChild(label);
   }
 
-  return group;
+  const wrapper = document.createElement('div');
+  wrapper.className = 'tenant-wizard-document-panel';
+  appendChildren(
+    wrapper,
+    createTextElement('p', 'tenant-wizard-document-panel__hint', t('tenantWizardDocumentSupportedFormats', locale)),
+    group
+  );
+  return wrapper;
+}
+
+function createDocumentVerificationSummary(
+  stepIndex: number,
+  summary: WizardScreenProps['documentVerification'],
+  locale: Locale
+): HTMLElement | null {
+  if (stepIndex !== 1 || !summary || (!summary.visa && !summary.employment)) {
+    return null;
+  }
+
+  const list = document.createElement('div');
+  list.className = 'tenant-wizard-document-results';
+
+  for (const kind of ['visa', 'employment'] as const) {
+    const result = summary[kind];
+
+    if (!result) {
+      continue;
+    }
+
+    const item = document.createElement('article');
+    item.className = 'tenant-wizard-document-result';
+    const title = createTextElement(
+      'h3',
+      'tenant-wizard-document-result__title',
+      t(kind === 'visa' ? 'tenantWizardDocumentVisaLabel' : 'tenantWizardDocumentEmploymentLabel', locale)
+    );
+    const meta = createTextElement(
+      'p',
+      'tenant-wizard-document-result__meta',
+      `${result.source} · ${t('tenantWizardDocumentEvidenceHash', locale)} ${result.evidenceHash.slice(0, 12)}...`
+    );
+
+    appendChildren(
+      item,
+      title,
+      Badge({
+        label: t(result.success ? 'tenantWizardDocumentVerified' : 'tenantWizardDocumentReviewNeeded', locale),
+        variant: result.success ? 'success' : 'warning'
+      }),
+      createTextElement('p', 'tenant-wizard-document-result__summary', result.summary),
+      meta
+    );
+    list.appendChild(item);
+  }
+
+  return list;
 }
 
 function createFixtureSelector(
@@ -289,7 +372,9 @@ function createStepCard(
   activeStepIndex: number,
   locale: Locale,
   selectedDocumentNames: WizardScreenProps['selectedDocumentNames'],
+  documentVerification: WizardScreenProps['documentVerification'],
   onDocumentChange: WizardScreenProps['onDocumentChange'],
+  onDocumentRemove: WizardScreenProps['onDocumentRemove'],
   onRunStep: (stepIndex: number) => void
 ): HTMLElement {
   const isActive = stepIndex === activeStepIndex;
@@ -309,7 +394,8 @@ function createStepCard(
           })
         : null,
       createCredentialFallbackGuide(stepIndex, step, locale),
-      createDocumentUploadControls(stepIndex, step.status, isActive, locale, selectedDocumentNames, onDocumentChange),
+      createDocumentVerificationSummary(stepIndex, documentVerification, locale),
+      createDocumentUploadControls(stepIndex, step.status, isActive, locale, selectedDocumentNames, onDocumentChange, onDocumentRemove),
       createStepAction(stepIndex, step.status, isActive, locale, onRunStep)
     ],
     elevated: isActive
@@ -352,14 +438,26 @@ export function WizardScreen({
   selectedFixtureId,
   isFixtureLocked,
   selectedDocumentNames,
+  documentVerification,
   localeToggle,
   onFixtureChange,
   onDocumentChange,
+  onDocumentRemove,
   onRunStep
 }: WizardScreenProps): HTMLElement {
   const normalizedLocale = normalizeLocale(locale);
   const stepCards = steps.map((step, index) =>
-    createStepCard(index, step, activeStepIndex, normalizedLocale, selectedDocumentNames, onDocumentChange, onRunStep)
+    createStepCard(
+      index,
+      step,
+      activeStepIndex,
+      normalizedLocale,
+      selectedDocumentNames,
+      documentVerification,
+      onDocumentChange,
+      onDocumentRemove,
+      onRunStep
+    )
   );
   const finalBadges = createFinalBadges(reportBadges, normalizedLocale);
 

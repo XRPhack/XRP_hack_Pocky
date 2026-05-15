@@ -19,6 +19,7 @@ import {
   type DashboardTrustGrade,
   type LoginStatus,
   type TenantWizardFixtureId,
+  type WizardDocumentVerificationSummary,
   type WizardStepStatus
 } from './screens';
 
@@ -44,6 +45,7 @@ type TenantState = {
     visa?: File;
     employment?: File;
   };
+  documentVerification?: WizardDocumentVerificationSummary;
   reportBadges: string[];
   dashboardBadges?: [DashboardBadge, DashboardBadge, DashboardBadge, DashboardBadge, DashboardBadge, DashboardBadge];
   reportId?: string;
@@ -182,6 +184,7 @@ function showOnboarding(): void {
   state.wizardStepIndex = 0;
   state.wizardSteps = createWizardStepStates();
   state.documentFiles = {};
+  state.documentVerification = undefined;
   clearDashboardReport();
   render();
 }
@@ -192,6 +195,7 @@ function showWizard(): void {
   state.wizardStepIndex = 0;
   state.wizardSteps = createWizardStepStates();
   state.documentFiles = {};
+  state.documentVerification = undefined;
   clearDashboardReport();
   render();
 }
@@ -217,13 +221,19 @@ function setDocumentFile(kind: 'visa' | 'employment', file: File | null): void {
 
   if (file) {
     state.documentFiles = { ...state.documentFiles, [kind]: file };
+    state.documentVerification = undefined;
   } else {
     const nextFiles = { ...state.documentFiles };
     delete nextFiles[kind];
     state.documentFiles = nextFiles;
+    state.documentVerification = undefined;
   }
 
   render();
+}
+
+function removeDocumentFile(kind: 'visa' | 'employment'): void {
+  setDocumentFile(kind, null);
 }
 
 function delay(milliseconds: number): Promise<void> {
@@ -344,6 +354,7 @@ async function uploadVerificationDocuments(): Promise<void> {
   }
 
   const payload = await response.json() as unknown;
+  state.documentVerification = parseDocumentVerificationSummary(payload);
 
   if (!isRecord(payload) || payload.status !== 'verified') {
     throw new WizardStepError(
@@ -351,6 +362,42 @@ async function uploadVerificationDocuments(): Promise<void> {
       t('tenantWizardDocumentReviewCopy', state.locale)
     );
   }
+}
+
+function parseDocumentVerificationSummary(payload: unknown): WizardDocumentVerificationSummary | undefined {
+  if (!isRecord(payload)) {
+    return undefined;
+  }
+
+  const verificationPayload = payload;
+
+  function parseResult(kind: 'visa' | 'employment') {
+    const result = verificationPayload[kind];
+
+    if (!isRecord(result) || !isRecord(result.data)) {
+      return undefined;
+    }
+
+    const source = getString(result.source);
+    const evidenceHash = getString(result.evidenceHash);
+    const summary = getString(result.data.summary);
+
+    if (!source || !evidenceHash || !summary) {
+      return undefined;
+    }
+
+    return {
+      success: result.success === true,
+      source,
+      evidenceHash,
+      summary
+    };
+  }
+
+  return {
+    visa: parseResult('visa'),
+    employment: parseResult('employment')
+  };
 }
 
 function parseDryRunReport(payload: unknown): {
@@ -675,9 +722,11 @@ function render(): void {
           visa: state.documentFiles.visa?.name,
           employment: state.documentFiles.employment?.name
         },
+        documentVerification: state.documentVerification,
         localeToggle: createHeaderActions(),
         onFixtureChange: selectWizardFixture,
         onDocumentChange: setDocumentFile,
+        onDocumentRemove: removeDocumentFile,
         onRunStep: (stepIndex) => {
           void runWizardStep(stepIndex);
         }
