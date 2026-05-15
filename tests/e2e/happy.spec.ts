@@ -9,12 +9,13 @@ const expectedEvidenceFiles = [
   '03-onboarding-housing.png',
   '04-onboarding-trust.png',
   '05-wizard-did.png',
-  '06-wizard-credentials.png',
-  '07-dashboard.png',
-  '08-toss-unlock.png',
-  '09-share-panel.png',
-  '10-verify-result.png',
-  '11-landlord-confirmation.png'
+  '06-wizard-documents.png',
+  '07-wizard-credentials.png',
+  '08-dashboard.png',
+  '09-toss-unlock.png',
+  '10-share-panel.png',
+  '11-verify-result.png',
+  '12-landlord-confirmation.png'
 ] as const;
 
 type LocalStorageSnapshot = Record<string, string | null>;
@@ -94,14 +95,20 @@ test('login to landlord confirmation happy path', async ({ browser }) => {
     await expect(page.getByRole('heading', { name: 'Create DID' })).toBeVisible();
     await page.getByRole('button', { name: 'Confirm DID' }).click();
     await expect(page.getByRole('link', { name: /DIDSet/ })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Issue credentials' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Verify documents' })).toBeVisible();
+    await expect(page.getByText('Demo fixture will be used')).toHaveCount(2);
     await saveEvidence(page, '05-wizard-did.png');
+
+    await page.getByRole('button', { name: 'Verify documents' }).click();
+    await expect(page.locator('.tenant-wizard-card').filter({ hasText: 'Verify documents' }).getByText('Success')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Issue credentials' })).toBeVisible();
+    await saveEvidence(page, '06-wizard-documents.png');
 
     await page.getByRole('button', { name: 'Confirm credentials' }).click();
     await expect(page.getByRole('link', { name: /Visa CredentialCreate/ })).toBeVisible();
     await expect(page.getByRole('link', { name: /Rent reputation CredentialAccept/ })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Lock escrow' })).toBeVisible();
-    await saveEvidence(page, '06-wizard-credentials.png');
+    await saveEvidence(page, '07-wizard-credentials.png');
 
     await page.getByRole('button', { name: 'Confirm escrow' }).click();
     await expect(page.getByRole('heading', { name: 'Ready to show your landlord', level: 1 })).toBeVisible();
@@ -112,13 +119,13 @@ test('login to landlord confirmation happy path', async ({ browser }) => {
     expect(dashboardGrade).toMatch(/^[ABCD]$/);
     await expectTenantSessionStorage(page);
     await expectNoSensitiveValues(page);
-    await saveEvidence(page, '07-dashboard.png');
+    await saveEvidence(page, '08-dashboard.png');
 
     await page.getByRole('button', { name: 'Open the Toss app-in-app mock unlock screen' }).click();
     await expect(page.getByRole('heading', { name: 'Foreigner loan limit unlock', level: 1 })).toBeVisible();
     await expect(page.getByText('+KRW 5M unlocked')).toBeVisible();
     await expect(page.getByText('No API calls')).toBeVisible();
-    await saveEvidence(page, '08-toss-unlock.png');
+    await saveEvidence(page, '09-toss-unlock.png');
 
     await page.getByRole('button', { name: 'Return to the trust pass dashboard' }).click();
     await expect(page.getByRole('heading', { name: 'Ready to show your landlord', level: 1 })).toBeVisible();
@@ -131,7 +138,7 @@ test('login to landlord confirmation happy path', async ({ browser }) => {
     await expect(page.locator('a.tenant-dashboard-qr')).toHaveAttribute('href', new URL(verifyPath, page.url()).toString());
     await page.getByRole('button', { name: 'Copy verification report link' }).click();
     await expect(page.getByText(/Link copied to your clipboard\.|Clipboard is unavailable\./)).toBeVisible();
-    await saveEvidence(page, '09-share-panel.png');
+    await saveEvidence(page, '10-share-panel.png');
 
     const landlordContext = await browser.newContext({ locale: 'en-US' });
     const landlordPage = await landlordContext.newPage();
@@ -145,12 +152,12 @@ test('login to landlord confirmation happy path', async ({ browser }) => {
       await expect(landlordPage.getByRole('link', { name: /DIDSet/ })).toBeVisible();
       await expect(landlordPage.evaluate(() => localStorage.getItem('nomokdon.session'))).resolves.toBeNull();
       await expectNoSensitiveValues(landlordPage);
-      await saveEvidence(landlordPage, '10-verify-result.png');
+      await saveEvidence(landlordPage, '11-verify-result.png');
 
       await landlordPage.getByRole('button', { name: 'I have confirmed' }).click();
       await expect(landlordPage.getByText('Confirmation recorded')).toBeVisible();
       await expect(landlordPage.getByRole('button', { name: 'I have confirmed' })).toBeDisabled();
-      await saveEvidence(landlordPage, '11-landlord-confirmation.png');
+      await saveEvidence(landlordPage, '12-landlord-confirmation.png');
 
       const logsResponse = await landlordPage.request.get(`${apiBaseUrl}/api/logs`);
       expect(logsResponse.ok()).toBe(true);

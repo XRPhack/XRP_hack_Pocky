@@ -5,7 +5,7 @@ const evidenceDir = '.sisyphus/evidence/edge';
 const expectedEvidenceFiles = [
   '01-login.png',
   '02-edge-fixture-selected.png',
-  '03-credential-failure.png',
+  '03-document-failure.png',
   '04-renewal-guide.png'
 ] as const;
 
@@ -63,18 +63,19 @@ test('expired visa fixture stops credential issuance with renewal guide', async 
     await page.getByRole('button', { name: 'Confirm DID' }).click();
     await expect(page.getByRole('link', { name: /DIDSet/ })).toBeVisible();
     await expect(page.locator('input[name="tenant-wizard-fixture"][value="edge"]')).toBeDisabled();
-    await expect(page.getByRole('heading', { name: 'Issue credentials' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Verify documents' })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Confirm credentials' }).click();
+    await page.getByRole('button', { name: 'Verify documents' }).click();
     await expect(page.getByRole('heading', { name: 'Pass cannot be created' })).toBeVisible();
     await expect(page.getByText(/expired on Feb 1, 2024/)).toBeVisible();
     await expect(page.getByText(/Credential issuance is stopped/)).toBeVisible();
-    await expect(page.locator('.tenant-wizard-card--active').getByRole('heading', { name: 'Issue credentials' })).toBeVisible();
+    await expect(page.locator('.tenant-wizard-card--active').getByRole('heading', { name: 'Verify documents' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Confirm credentials' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Confirm escrow' })).toHaveCount(0);
     await expect(page.getByRole('link', { name: /Visa CredentialCreate/ })).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Ready to show your landlord', level: 1 })).toHaveCount(0);
     await expect(page.locator('code.tenant-dashboard-share__url')).toHaveCount(0);
-    await saveEvidence(page, '03-credential-failure.png');
+    await saveEvidence(page, '03-document-failure.png');
 
     await expect(page.getByRole('heading', { name: 'Renew visa evidence before retrying' })).toBeVisible();
     await expect(page.getByText('Retry only after the updated fixture verifies successfully; this edge path never force-issues credentials.')).toBeVisible();
