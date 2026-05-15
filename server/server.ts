@@ -6,8 +6,15 @@ import { Wallet } from 'xrpl';
 
 import demoFixtures from '../scripts/demo-fixtures.json' with { type: 'json' };
 import { employmentEdgeCase, employmentHappyCase } from '../src/domain/adapters/employment.fixture.js';
+import { employmentDocumentAdapter } from '../src/domain/adapters/employment-document.adapter.js';
+import type {
+  UploadedDocumentPayload,
+  UploadedEmploymentVerificationData,
+  UploadedVisaVerificationData
+} from '../src/domain/adapters/document.types.js';
 import { rentLedgerEdgeCase, rentLedgerHappyCase } from '../src/domain/adapters/rent-ledger.fixture.js';
 import { visaEdgeCase, visaHappyCase } from '../src/domain/adapters/visa.fixture.js';
+import { visaDocumentAdapter } from '../src/domain/adapters/visa-document.adapter.js';
 import { buildReport, type BuiltReport, type ReportRentPayment } from '../src/domain/report.js';
 import { buildCredentialAccept, buildCredentialCreate, submitCreate } from '../src/domain/xrplCredential.js';
 import { buildDidSet } from '../src/domain/xrplDid.js';
@@ -66,6 +73,28 @@ type EncryptedStoredReport = {
 
 type StoredReport = PlainStoredReport | EncryptedStoredReport;
 
+type DocumentVerificationRecord = {
+  sessionId: string;
+  subjectId: string;
+  createdAt: string;
+  visa?: {
+    success: boolean;
+    source: string;
+    verifiedAt: string;
+    evidenceHash: string;
+    data: UploadedVisaVerificationData;
+    message?: string;
+  };
+  employment?: {
+    success: boolean;
+    source: string;
+    verifiedAt: string;
+    evidenceHash: string;
+    data: UploadedEmploymentVerificationData;
+    message?: string;
+  };
+};
+
 type IssuerConfig = {
   issuerAddress: string;
   wallet: Wallet | null;
@@ -118,7 +147,7 @@ const ISSUER_SESSION_MAX_AGE_SECONDS = 60 * 60 * 8;
 const LOG_ID_PREFIX = 'log_';
 const REPORT_ID_PREFIX = 'report_';
 const DEFAULT_ISSUER_ADDRESS = 'rNomokDonIssuerDryRunOnly';
-const MAX_BODY_BYTES = 1_000_000;
+const MAX_BODY_BYTES = 10_000_000;
 const VC_ENCRYPTION_ALGORITHM = 'aes-256-gcm';
 const VC_ENCRYPTION_KEY_BYTES = 32;
 const VC_ENCRYPTION_IV_BYTES = 12;
@@ -128,6 +157,7 @@ const sessionsById = new Map<string, ApiSession>();
 const issuerSessionsById = new Map<string, string>();
 const walletByUserId = new Map<string, TenantWalletMapping>();
 const reportsById = new Map<string, StoredReport>();
+const documentVerificationsBySessionId = new Map<string, DocumentVerificationRecord>();
 const logEvents: LogEvent[] = [];
 
 let activeSessionId: string | null = null;
@@ -238,6 +268,33 @@ function normalizeLocale(value: unknown): SessionLocale {
   }
 
   return 'en';
+}
+
+function normalizeUploadedDocumentPayload(value: unknown): UploadedDocumentPayload | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const filename = normalizeString(value.filename);
+  const mimeType = normalizeString(value.mimeType);
+  const base64 = normalizeString(value.base64);
+  const allowedMimeTypes = new Set([
+    'application/json',
+    'text/plain',
+    'application/pdf',
+    'image/png',
+    'image/jpeg'
+  ]);
+
+  if (!filename || !mimeType || !base64 || !allowedMimeTypes.has(mimeType)) {
+    return undefined;
+  }
+
+  return {
+    filename,
+    mimeType: mimeType as UploadedDocumentPayload['mimeType'],
+    base64
+  };
 }
 
 function isSecretKey(key: string): boolean {
@@ -581,6 +638,7 @@ async function handleHealth(response: ServerResponse): Promise<void> {
       'GET /api/health',
       'POST /api/auth/toss-mock',
       'GET /api/session',
+      'POST /api/verification-documents',
       'POST /api/issuer/login',
       'GET /api/issuer/session',
       'POST /api/issuer/simulator',
@@ -651,6 +709,85 @@ async function handleSession(request: IncomingMessage, response: ServerResponse,
   });
 }
 
+async function handleVerificationDocuments(
+  request: IncomingMessage,
+  response: ServerResponse,
+  url: URL
+): Promise<void> {
+  const body = await readJsonBody(request);
+  const { sessionId, session } = getCurrentSession(request, url, body);
+
+  if (!sessionId && !normalizeString(body.subjectId)) {
+    sendError(response, 400, 'SESSION_OR_SUBJECT_REQUIRED', 'Provide a session or subjectId for document verification.');
+    return;
+  }
+
+  const subjectId = normalizeString(body.subjectId) ?? session?.userId ?? sessionId ?? 'tenant-local';
+  const createdAt = nowIso();
+  const visaDocument = normalizeUploadedDocumentPayload(body.visaDocument);
+  const employmentDocument = normalizeUploadedDocumentPayload(body.employmentDocument);
+
+  if (!visaDocument && !employmentDocument) {
+    sendError(response, 400, 'DOCUMENT_REQUIRED', 'Upload at least one visaDocument or employmentDocument.');
+    return;
+  }
+
+  const record: DocumentVerificationRecord = {
+    sessionId: sessionId ?? `subject:${subjectId}`,
+    subjectId,
+    createdAt
+  };
+
+  if (visaDocument) {
+    const result = await visaDocumentAdapter.verify({
+      subjectId,
+      document: visaDocument,
+      now: createdAt
+    });
+
+    record.visa = {
+      success: result.success,
+      source: result.source,
+      verifiedAt: result.verifiedAt,
+      evidenceHash: result.evidenceHash,
+      data: result.data,
+      message: result.message
+    };
+  }
+
+  if (employmentDocument) {
+    const result = await employmentDocumentAdapter.verify({
+      subjectId,
+      document: employmentDocument,
+      now: createdAt
+    });
+
+    record.employment = {
+      success: result.success,
+      source: result.source,
+      verifiedAt: result.verifiedAt,
+      evidenceHash: result.evidenceHash,
+      data: result.data,
+      message: result.message
+    };
+  }
+
+  documentVerificationsBySessionId.set(record.sessionId, record);
+
+  sendJson(response, 201, {
+    ok: true,
+    verificationId: record.sessionId,
+    subjectId,
+    status:
+      (record.visa ? record.visa.success : true) &&
+      (record.employment ? record.employment.success : true)
+        ? 'verified'
+        : 'review-needed',
+    visa: record.visa,
+    employment: record.employment
+  });
+}
+
 async function handleSignAndSubmit(request: IncomingMessage, response: ServerResponse, url: URL): Promise<void> {
   const body = await readJsonBody(request);
   const { sessionId, session } = getCurrentSession(request, url, body);
@@ -665,13 +802,27 @@ async function handleSignAndSubmit(request: IncomingMessage, response: ServerRes
   const credentialType = normalizeString(body.credentialType) ?? 'nomokdon-visa';
   const reportId = isVcEncryptionConfigured() ? createId(REPORT_ID_PREFIX) : normalizeString(body.reportId) ?? createId(REPORT_ID_PREFIX);
   const credentialId = normalizeString(body.credentialId) ?? `vc_${reportId}`;
-  const expiration = normalizeString(body.expiration) ?? '2027-06-30T00:00:00.000Z';
   const purpose = normalizeString(body.purpose) ?? 'nomokdon-housing-trust-pass';
   const landlordAddress = normalizeString(body.landlordAddress) ?? 'rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW';
   const monthlyIncomeKrw = toNumber(body.monthlyIncomeKrw, 2_750_000);
   const monthlyRentKrw = toNumber(body.monthlyRentKrw, 650_000);
   const dryRunRequested = body.dryRun !== false;
   const issuedAt = nowIso();
+  const documentVerification = sessionId ? documentVerificationsBySessionId.get(sessionId) : undefined;
+  const expiration =
+    normalizeString(body.expiration) ??
+    (documentVerification?.visa?.success ? documentVerification.visa.data.expiresAt : undefined) ??
+    '2027-06-30T00:00:00.000Z';
+  const visaStatus: VerificationStatus = documentVerification?.visa
+    ? documentVerification.visa.success ? 'pass' : 'fail'
+    : 'pass';
+  const employmentStatus: VerificationStatus = documentVerification?.employment
+    ? documentVerification.employment.success ? 'pass' : 'warning'
+    : body.employmentVerified !== false ? 'pass' : 'warning';
+  const documentAnchors = [
+    documentVerification?.visa?.evidenceHash,
+    documentVerification?.employment?.evidenceHash
+  ].filter((hash): hash is string => Boolean(hash));
   const didSet = buildDidSet({ account: tenantAddress, purpose });
   const credentialCreate = buildCredentialCreate({
     issuer: issuerConfig.issuerAddress,
@@ -694,12 +845,15 @@ async function handleSignAndSubmit(request: IncomingMessage, response: ServerRes
   const tenantProfile: TenantProfile = {
     id: session?.userId ?? 'tenant-local',
     displayName: session?.name ?? 'NomokDon Tenant',
-    nationality: normalizeString(body.nationality) ?? 'local',
-    visaType: normalizeString(body.visaType) ?? 'E-9',
+    nationality: documentVerification?.visa?.data.nationality ?? normalizeString(body.nationality) ?? 'local',
+    visaType: documentVerification?.visa?.data.visaType ?? normalizeString(body.visaType) ?? 'E-9',
     visaExpiresAt: expiration,
     monthlyIncomeKrw,
-    employmentVerified: body.employmentVerified !== false,
-    schoolOrEmployer: normalizeString(body.schoolOrEmployer) ?? 'Local employer',
+    employmentVerified: employmentStatus === 'pass',
+    schoolOrEmployer:
+      documentVerification?.employment?.source ??
+      normalizeString(body.schoolOrEmployer) ??
+      'Local employer',
     passportNumber: 'hashed-offchain-only',
     phoneNumber: session?.phone ?? '+82-10-0000-0000',
     xrplAccount: tenantAddress
@@ -721,13 +875,13 @@ async function handleSignAndSubmit(request: IncomingMessage, response: ServerRes
     vp: {
       reportId,
       holderId: tenantProfile.id,
-      status: 'pass' as VerificationStatus,
-      visaStatus: 'pass' as VerificationStatus,
-      employmentStatus: tenantProfile.employmentVerified ? 'pass' : 'warning',
+      status: visaStatus === 'pass' && employmentStatus === 'pass' ? 'pass' : 'warning',
+      visaStatus,
+      employmentStatus,
       monthlyIncomeKrw,
       monthlyRentKrw,
       credentials: [{ type: credentialType, status: 'pass', credentialId }],
-      anchors: [escrowDraft.contractHash]
+      anchors: [escrowDraft.contractHash, ...documentAnchors]
     },
     escrowState: {
       state: 'ready-to-sign',
@@ -786,6 +940,16 @@ async function handleSignAndSubmit(request: IncomingMessage, response: ServerRes
       tenantWalletAddress: tenantAddress,
       escrowAmountXrp: escrowDraft.amountXrp,
       credentialType,
+      documentVerification: documentVerification
+        ? {
+            visa: documentVerification.visa
+              ? { success: documentVerification.visa.success, source: documentVerification.visa.source }
+              : undefined,
+            employment: documentVerification.employment
+              ? { success: documentVerification.employment.success, source: documentVerification.employment.source }
+              : undefined
+          }
+        : undefined,
       dryRunReason: submission.reason
     }
   });
@@ -804,6 +968,7 @@ async function handleSignAndSubmit(request: IncomingMessage, response: ServerRes
       rentPayment,
       escrowCreate: escrowDraft.createTx
     },
+    documentVerification,
     submission,
     report,
     logId: logEvent.id
@@ -1014,6 +1179,11 @@ export async function handleApiRequest(request: IncomingMessage, response: Serve
       return;
     }
 
+    if (request.method === 'POST' && pathname === '/api/verification-documents') {
+      await handleVerificationDocuments(request, response, url);
+      return;
+    }
+
     if (request.method === 'POST' && pathname === '/api/issuer/login') {
       await handleIssuerLogin(request, response);
       return;
@@ -1072,6 +1242,7 @@ export function resetApiState(): void {
   issuerSessionsById.clear();
   walletByUserId.clear();
   reportsById.clear();
+  documentVerificationsBySessionId.clear();
   logEvents.splice(0, logEvents.length);
   activeSessionId = null;
 }
