@@ -146,6 +146,14 @@ type DocumentVerificationRecord = {
   };
 };
 
+type DocumentReviewReason = {
+  kind: 'visa' | 'employment';
+  code: 'parse-failed' | 'verification-failed' | 'authenticity-missing';
+  title: string;
+  message: string;
+  action: string;
+};
+
 type IssuerConfig = {
   issuerAddress: string;
   wallet: Wallet | null;
@@ -834,6 +842,51 @@ function createReportAuthenticityChecks(documentVerification?: DocumentVerificat
   return checks;
 }
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Document could not be parsed.';
+}
+
+function createDocumentParseReviewReason(kind: 'visa' | 'employment', error: unknown): DocumentReviewReason {
+  return {
+    kind,
+    code: 'parse-failed',
+    title: kind === 'visa' ? 'Visa document could not be read.' : 'Employment or school document could not be read.',
+    message: errorMessage(error),
+    action: 'Upload JSON, plain text, or a text-based PDF. Scanned images and image-only PDFs need manual review or OCR first.'
+  };
+}
+
+function createDocumentResultReviewReasons(
+  kind: 'visa' | 'employment',
+  result: NonNullable<DocumentVerificationRecord['visa'] | DocumentVerificationRecord['employment']>
+): DocumentReviewReason[] {
+  const reasons: DocumentReviewReason[] = [];
+
+  if (!result.success) {
+    reasons.push({
+      kind,
+      code: 'verification-failed',
+      title: kind === 'visa' ? 'Visa document needs review.' : 'Employment or school document needs review.',
+      message: result.message ?? result.data.summary,
+      action: kind === 'visa'
+        ? 'Upload a current visa or foreign-registration document that includes visa type and expiry date.'
+        : 'Upload an active employment, insurance, pension, or school enrollment document.'
+    });
+  }
+
+  if (result.data.authenticity.status !== 'ready') {
+    reasons.push({
+      kind,
+      code: 'authenticity-missing',
+      title: kind === 'visa' ? 'Visa authenticity check is incomplete.' : 'Employment authenticity check is incomplete.',
+      message: result.data.authenticity.summary,
+      action: 'Upload a version that includes a document verification code, issue number, or QR verification URL.'
+    });
+  }
+
+  return reasons;
+}
+
 async function handleHealth(response: ServerResponse): Promise<void> {
   const issuerConfig = resolveIssuerConfig(process.env);
 
@@ -947,39 +1000,50 @@ async function handleVerificationDocuments(
     subjectId,
     createdAt
   };
+  const reviewReasons: DocumentReviewReason[] = [];
 
   if (visaDocument) {
-    const result = await visaDocumentAdapter.verify({
-      subjectId,
-      document: visaDocument,
-      now: createdAt
-    });
+    try {
+      const result = await visaDocumentAdapter.verify({
+        subjectId,
+        document: visaDocument,
+        now: createdAt
+      });
 
-    record.visa = {
-      success: result.success,
-      source: result.source,
-      verifiedAt: result.verifiedAt,
-      evidenceHash: result.evidenceHash,
-      data: result.data,
-      message: result.message
-    };
+      record.visa = {
+        success: result.success,
+        source: result.source,
+        verifiedAt: result.verifiedAt,
+        evidenceHash: result.evidenceHash,
+        data: result.data,
+        message: result.message
+      };
+      reviewReasons.push(...createDocumentResultReviewReasons('visa', record.visa));
+    } catch (error) {
+      reviewReasons.push(createDocumentParseReviewReason('visa', error));
+    }
   }
 
   if (employmentDocument) {
-    const result = await employmentDocumentAdapter.verify({
-      subjectId,
-      document: employmentDocument,
-      now: createdAt
-    });
+    try {
+      const result = await employmentDocumentAdapter.verify({
+        subjectId,
+        document: employmentDocument,
+        now: createdAt
+      });
 
-    record.employment = {
-      success: result.success,
-      source: result.source,
-      verifiedAt: result.verifiedAt,
-      evidenceHash: result.evidenceHash,
-      data: result.data,
-      message: result.message
-    };
+      record.employment = {
+        success: result.success,
+        source: result.source,
+        verifiedAt: result.verifiedAt,
+        evidenceHash: result.evidenceHash,
+        data: result.data,
+        message: result.message
+      };
+      reviewReasons.push(...createDocumentResultReviewReasons('employment', record.employment));
+    } catch (error) {
+      reviewReasons.push(createDocumentParseReviewReason('employment', error));
+    }
   }
 
   documentVerificationsBySessionId.set(record.sessionId, record);
@@ -990,9 +1054,11 @@ async function handleVerificationDocuments(
     subjectId,
     status:
       (record.visa ? record.visa.success : true) &&
-      (record.employment ? record.employment.success : true)
+      (record.employment ? record.employment.success : true) &&
+      reviewReasons.length === 0
         ? 'verified'
         : 'review-needed',
+    reviewReasons,
     visa: record.visa,
     employment: record.employment
   });

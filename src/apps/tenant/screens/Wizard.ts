@@ -13,6 +13,14 @@ export type WizardDocumentAuthenticity = {
   summary: string;
 };
 
+export type WizardDocumentReviewReason = {
+  kind: 'visa' | 'employment';
+  code: 'parse-failed' | 'verification-failed' | 'authenticity-missing';
+  title: string;
+  message: string;
+  action: string;
+};
+
 type WizardDocumentVerificationResult = {
   success: boolean;
   source: string;
@@ -31,6 +39,7 @@ type WizardStepState = {
 export type WizardDocumentVerificationSummary = {
   visa?: WizardDocumentVerificationResult;
   employment?: WizardDocumentVerificationResult;
+  reviewReasons: WizardDocumentReviewReason[];
 };
 
 type WizardScreenProps = {
@@ -255,7 +264,7 @@ function createDocumentVerificationSummary(
   summary: WizardScreenProps['documentVerification'],
   locale: Locale
 ): HTMLElement | null {
-  if (stepIndex !== 1 || !summary || (!summary.visa && !summary.employment)) {
+  if (stepIndex !== 1 || !summary || (!summary.visa && !summary.employment && summary.reviewReasons.length === 0)) {
     return null;
   }
 
@@ -299,7 +308,40 @@ function createDocumentVerificationSummary(
     list.appendChild(item);
   }
 
+  if (summary.reviewReasons.length > 0) {
+    list.appendChild(createDocumentReviewReasons(summary.reviewReasons, locale));
+  }
+
   return list;
+}
+
+function createDocumentReviewReasons(reasons: WizardDocumentReviewReason[], locale: Locale): HTMLElement {
+  const panel = document.createElement('section');
+  panel.className = 'tenant-wizard-document-review';
+
+  const list = document.createElement('ul');
+  list.className = 'tenant-wizard-document-review__list';
+
+  for (const reason of reasons) {
+    const item = document.createElement('li');
+    item.className = 'tenant-wizard-document-review__item';
+    appendChildren(
+      item,
+      createTextElement('strong', 'tenant-wizard-document-review__title', reason.title),
+      createTextElement('span', 'tenant-wizard-document-review__message', reason.message),
+      createTextElement('span', 'tenant-wizard-document-review__action', reason.action)
+    );
+    list.appendChild(item);
+  }
+
+  appendChildren(
+    panel,
+    Badge({ label: t('tenantWizardDocumentReviewNeeded', locale), variant: 'warning' }),
+    createTextElement('h3', 'tenant-wizard-document-review__heading', t('tenantWizardDocumentReviewReasonTitle', locale)),
+    list
+  );
+
+  return panel;
 }
 
 function createDocumentAuthenticity(authenticity: WizardDocumentAuthenticity, locale: Locale): HTMLElement {

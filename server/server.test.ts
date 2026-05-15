@@ -616,6 +616,55 @@ describe('mini Node API', () => {
     ]);
   });
 
+  it('returns structured review reasons when uploaded documents need manual handling', async () => {
+    const auth = await postJson('/api/auth/toss-mock', {
+      userId: 'user-doc-review',
+      name: 'Manual Review Tenant',
+      phone: '+82-10-5555-3434'
+    });
+    const sessionId = String(auth.json.sessionId);
+    const upload = await postJson(
+      '/api/verification-documents',
+      {
+        sessionId,
+        visaDocument: {
+          filename: 'visa-scan.png',
+          mimeType: 'image/png',
+          base64: Buffer.from('png scan placeholder', 'utf8').toString('base64')
+        },
+        employmentDocument: {
+          filename: 'employment.txt',
+          mimeType: 'text/plain',
+          base64: Buffer.from([
+            'verificationChannel: school',
+            'organizationName: Busan Technical College',
+            'roleOrProgram: International Welding Program',
+            'acquiredAt: 2025-03-01T00:00:00.000Z'
+          ].join('\n'), 'utf8').toString('base64')
+        }
+      },
+      { 'x-session-id': sessionId }
+    );
+
+    expect(upload.response.status).toBe(201);
+    expect(upload.json).toMatchObject({
+      ok: true,
+      status: 'review-needed',
+      reviewReasons: expect.arrayContaining([
+        expect.objectContaining({ kind: 'visa', code: 'parse-failed' }),
+        expect.objectContaining({ kind: 'employment', code: 'authenticity-missing' })
+      ]),
+      employment: expect.objectContaining({
+        success: true,
+        data: expect.objectContaining({
+          authenticity: expect.objectContaining({ status: 'not-checked', method: 'missing' })
+        })
+      })
+    });
+    expect(upload.text).toContain('Scanned images and image-only PDFs need manual review or OCR first.');
+    expect(upload.text).not.toContain('png scan placeholder');
+  });
+
   it('encrypts the in-memory report store and preserves report API responses when configured', async () => {
     const keyMaterial = '0123456789abcdef0123456789abcdef';
     const callerProvidedReportId = 'report_caller_supplied_should_not_be_stored';

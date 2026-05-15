@@ -20,6 +20,7 @@ import {
   type LoginStatus,
   type TenantWizardFixtureId,
   type WizardDocumentAuthenticity,
+  type WizardDocumentReviewReason,
   type WizardDocumentVerificationSummary,
   type WizardStepStatus
 } from './screens';
@@ -140,6 +141,14 @@ function isDocumentAuthenticityStatus(value: unknown): value is WizardDocumentAu
 
 function isDocumentAuthenticityMethod(value: unknown): value is WizardDocumentAuthenticity['method'] {
   return value === 'document-code' || value === 'qr-url' || value === 'missing';
+}
+
+function isDocumentReviewKind(value: unknown): value is WizardDocumentReviewReason['kind'] {
+  return value === 'visa' || value === 'employment';
+}
+
+function isDocumentReviewCode(value: unknown): value is WizardDocumentReviewReason['code'] {
+  return value === 'parse-failed' || value === 'verification-failed' || value === 'authenticity-missing';
 }
 
 function clearDashboardReport(): void {
@@ -368,9 +377,12 @@ async function uploadVerificationDocuments(): Promise<void> {
   state.documentVerification = parseDocumentVerificationSummary(payload);
 
   if (!isRecord(payload) || payload.status !== 'verified') {
+    const reviewMessage = state.documentVerification?.reviewReasons
+      .map((reason) => `${reason.title} ${reason.action}`)
+      .join(' ');
     throw new WizardStepError(
       t('tenantWizardDocumentReviewTitle', state.locale),
-      t('tenantWizardDocumentReviewCopy', state.locale)
+      reviewMessage || t('tenantWizardDocumentReviewCopy', state.locale)
     );
   }
 }
@@ -409,8 +421,35 @@ function parseDocumentVerificationSummary(payload: unknown): WizardDocumentVerif
 
   return {
     visa: parseResult('visa'),
-    employment: parseResult('employment')
+    employment: parseResult('employment'),
+    reviewReasons: parseDocumentReviewReasons(verificationPayload.reviewReasons)
   };
+}
+
+function parseDocumentReviewReasons(value: unknown): WizardDocumentReviewReason[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((reason) => {
+      if (!isRecord(reason)) {
+        return undefined;
+      }
+
+      const kind = reason.kind;
+      const code = reason.code;
+      const title = getString(reason.title);
+      const message = getString(reason.message);
+      const action = getString(reason.action);
+
+      if (!isDocumentReviewKind(kind) || !isDocumentReviewCode(code) || !title || !message || !action) {
+        return undefined;
+      }
+
+      return { kind, code, title, message, action };
+    })
+    .filter((reason): reason is WizardDocumentReviewReason => Boolean(reason));
 }
 
 function parseDocumentAuthenticity(value: unknown): WizardDocumentAuthenticity | undefined {

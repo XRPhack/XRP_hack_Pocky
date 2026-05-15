@@ -1230,6 +1230,65 @@ body {
   align-items: center;
 }
 
+.tenant-wizard-document-review {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: var(--border-width-hairline) solid var(--color-warning-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-warning-background);
+}
+
+.tenant-wizard-document-review__heading,
+.tenant-wizard-document-review__list,
+.tenant-wizard-document-review__title,
+.tenant-wizard-document-review__message,
+.tenant-wizard-document-review__action {
+  margin: 0;
+}
+
+.tenant-wizard-document-review__heading {
+  color: var(--color-neutral-900);
+  font-size: var(--font-size-body);
+  font-weight: 900;
+}
+
+.tenant-wizard-document-review__list {
+  display: grid;
+  gap: var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+
+.tenant-wizard-document-review__item {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.tenant-wizard-document-review__title,
+.tenant-wizard-document-review__message,
+.tenant-wizard-document-review__action {
+  overflow-wrap: anywhere;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-copy);
+}
+
+.tenant-wizard-document-review__title {
+  color: var(--color-neutral-900);
+  font-weight: 900;
+}
+
+.tenant-wizard-document-review__message {
+  color: var(--color-neutral-700);
+  font-weight: 700;
+}
+
+.tenant-wizard-document-review__action {
+  color: var(--color-warning-text);
+  font-weight: 900;
+}
+
 .tenant-wizard-renewal-guide {
   border-color: var(--color-warning-border);
   background:

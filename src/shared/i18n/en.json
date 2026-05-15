@@ -89,6 +89,7 @@
   "tenantWizardDocumentErrorCopy": "Document verification could not be completed. Check the local API and try again.",
   "tenantWizardDocumentReviewTitle": "Document review needed",
   "tenantWizardDocumentReviewCopy": "The uploaded document evidence did not pass verification, so credential issuance is paused.",
+  "tenantWizardDocumentReviewReasonTitle": "What needs to be fixed",
   "tenantWizardStepCredentialTitle": "Issue credentials",
   "tenantWizardStepCredentialCopy": "Review the visa and rent-reputation Credential issue and accept records together.",
   "tenantWizardStepCredentialAction": "Confirm credentials",

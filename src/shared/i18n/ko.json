@@ -89,6 +89,7 @@
   "tenantWizardDocumentErrorCopy": "서류 검증을 완료하지 못했습니다. 로컬 API를 확인한 뒤 다시 시도해 주세요.",
   "tenantWizardDocumentReviewTitle": "서류 검토 필요",
   "tenantWizardDocumentReviewCopy": "제출된 서류 근거가 검증을 통과하지 못해 Credential 발급을 중단했습니다.",
+  "tenantWizardDocumentReviewReasonTitle": "수정이 필요한 항목",
   "tenantWizardStepCredentialTitle": "Credential 발급",
   "tenantWizardStepCredentialCopy": "비자와 월세 평판 Credential 발급·수락 기록을 한 번에 확인합니다.",
   "tenantWizardStepCredentialAction": "Credential 발급 확인",
