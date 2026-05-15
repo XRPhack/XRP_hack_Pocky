@@ -73,6 +73,49 @@ type EncryptedStoredReport = {
 
 type StoredReport = PlainStoredReport | EncryptedStoredReport;
 
+type StoredDidDocument = {
+  id: string;
+  controller: string;
+  alsoKnownAs: string[];
+  service: Array<{
+    id: string;
+    type: string;
+    serviceEndpoint: string;
+  }>;
+  proofPurpose: string;
+  createdAt: string;
+};
+
+type StoredVerifiableCredential = {
+  id: string;
+  type: string[];
+  issuer: string;
+  issuanceDate: string;
+  expirationDate?: string;
+  credentialSubject: {
+    id: string;
+    walletAddress: string;
+    visa?: {
+      verified: boolean;
+      visaType: string;
+      nationality: string;
+      expiresAt: string;
+      evidenceHash?: string;
+    };
+    employment?: {
+      verified: boolean;
+      channel: string;
+      evidenceHash?: string;
+    };
+    reportId: string;
+  };
+  evidence: Array<{
+    type: string;
+    source: string;
+    hash: string;
+  }>;
+};
+
 type DocumentVerificationRecord = {
   sessionId: string;
   subjectId: string;
@@ -157,6 +200,8 @@ const sessionsById = new Map<string, ApiSession>();
 const issuerSessionsById = new Map<string, string>();
 const walletByUserId = new Map<string, TenantWalletMapping>();
 const reportsById = new Map<string, StoredReport>();
+const didDocumentsByAccount = new Map<string, StoredDidDocument>();
+const verifiableCredentialsById = new Map<string, StoredVerifiableCredential>();
 const documentVerificationsBySessionId = new Map<string, DocumentVerificationRecord>();
 const logEvents: LogEvent[] = [];
 
@@ -626,6 +671,112 @@ function toRentHistory(value: unknown): ReportRentPayment[] {
     }));
 }
 
+function createDidDocument({
+  account,
+  did,
+  credentialId,
+  reportId,
+  purpose,
+  createdAt
+}: {
+  account: string;
+  did: string;
+  credentialId: string;
+  reportId: string;
+  purpose: string;
+  createdAt: string;
+}): StoredDidDocument {
+  return {
+    id: did,
+    controller: account,
+    alsoKnownAs: [`xrpl:testnet:${account}`],
+    service: [
+      {
+        id: `${did}#credential-${credentialId}`,
+        type: 'VerifiableCredentialService',
+        serviceEndpoint: `/api/vc/${encodeURIComponent(credentialId)}`
+      },
+      {
+        id: `${did}#report-${reportId}`,
+        type: 'TrustReportService',
+        serviceEndpoint: `/api/report/${encodeURIComponent(reportId)}`
+      }
+    ],
+    proofPurpose: purpose,
+    createdAt
+  };
+}
+
+function createVerifiableCredential({
+  credentialId,
+  credentialType,
+  issuer,
+  subjectDid,
+  tenantAddress,
+  reportId,
+  expiration,
+  issuedAt,
+  documentVerification
+}: {
+  credentialId: string;
+  credentialType: string;
+  issuer: string;
+  subjectDid: string;
+  tenantAddress: string;
+  reportId: string;
+  expiration: string;
+  issuedAt: string;
+  documentVerification?: DocumentVerificationRecord;
+}): StoredVerifiableCredential {
+  const evidence: StoredVerifiableCredential['evidence'] = [];
+
+  if (documentVerification?.visa) {
+    evidence.push({
+      type: 'VisaDocumentHash',
+      source: documentVerification.visa.source,
+      hash: documentVerification.visa.evidenceHash
+    });
+  }
+
+  if (documentVerification?.employment) {
+    evidence.push({
+      type: 'EmploymentDocumentHash',
+      source: documentVerification.employment.source,
+      hash: documentVerification.employment.evidenceHash
+    });
+  }
+
+  return {
+    id: credentialId,
+    type: ['VerifiableCredential', credentialType],
+    issuer,
+    issuanceDate: issuedAt,
+    expirationDate: expiration,
+    credentialSubject: {
+      id: subjectDid,
+      walletAddress: tenantAddress,
+      visa: documentVerification?.visa
+        ? {
+            verified: documentVerification.visa.success,
+            visaType: documentVerification.visa.data.visaType,
+            nationality: documentVerification.visa.data.nationality,
+            expiresAt: documentVerification.visa.data.expiresAt,
+            evidenceHash: documentVerification.visa.evidenceHash
+          }
+        : undefined,
+      employment: documentVerification?.employment
+        ? {
+            verified: documentVerification.employment.success,
+            channel: documentVerification.employment.data.verificationChannel,
+            evidenceHash: documentVerification.employment.evidenceHash
+          }
+        : undefined,
+      reportId
+    },
+    evidence
+  };
+}
+
 async function handleHealth(response: ServerResponse): Promise<void> {
   const issuerConfig = resolveIssuerConfig(process.env);
 
@@ -644,6 +795,8 @@ async function handleHealth(response: ServerResponse): Promise<void> {
       'POST /api/issuer/simulator',
       'POST /api/sign-and-submit',
       'GET /api/report/:id',
+      'GET /api/did/:account',
+      'GET /api/vc/:credentialId',
       'POST /api/logs',
       'GET /api/logs'
     ],
@@ -823,6 +976,7 @@ async function handleSignAndSubmit(request: IncomingMessage, response: ServerRes
     documentVerification?.visa?.evidenceHash,
     documentVerification?.employment?.evidenceHash
   ].filter((hash): hash is string => Boolean(hash));
+  const subjectDid = `did:xrpl:testnet:${tenantAddress}`;
   const didSet = buildDidSet({ account: tenantAddress, purpose });
   const credentialCreate = buildCredentialCreate({
     issuer: issuerConfig.issuerAddress,
@@ -926,6 +1080,31 @@ async function handleSignAndSubmit(request: IncomingMessage, response: ServerRes
   }
 
   reportsById.set(report.reportId, storedReport);
+  didDocumentsByAccount.set(
+    tenantAddress,
+    createDidDocument({
+      account: tenantAddress,
+      did: subjectDid,
+      credentialId,
+      reportId: report.reportId,
+      purpose,
+      createdAt: issuedAt
+    })
+  );
+  verifiableCredentialsById.set(
+    credentialId,
+    createVerifiableCredential({
+      credentialId,
+      credentialType,
+      issuer: issuerConfig.issuerAddress,
+      subjectDid,
+      tenantAddress,
+      reportId: report.reportId,
+      expiration,
+      issuedAt,
+      documentVerification
+    })
+  );
 
   const status = submission.status === 'submitted' ? 'submitted' : 'dry-run';
   const logEvent = appendLog({
@@ -991,6 +1170,34 @@ async function handleReport(response: ServerResponse, reportId: string): Promise
   } catch {
     sendError(response, 500, 'REPORT_DECRYPTION_FAILED', 'Stored report is not available.');
   }
+}
+
+async function handleDidDocument(response: ServerResponse, account: string): Promise<void> {
+  const didDocument = didDocumentsByAccount.get(account);
+
+  if (!didDocument) {
+    sendError(response, 404, 'DID_DOCUMENT_NOT_FOUND', 'No DID document placeholder exists for the requested account.');
+    return;
+  }
+
+  sendJson(response, 200, {
+    ok: true,
+    didDocument
+  });
+}
+
+async function handleVerifiableCredential(response: ServerResponse, credentialId: string): Promise<void> {
+  const credential = verifiableCredentialsById.get(credentialId);
+
+  if (!credential) {
+    sendError(response, 404, 'VC_NOT_FOUND', 'No verifiable credential placeholder exists for the requested id.');
+    return;
+  }
+
+  sendJson(response, 200, {
+    ok: true,
+    credential
+  });
 }
 
 async function handleLogs(response: ServerResponse): Promise<void> {
@@ -1209,6 +1416,16 @@ export async function handleApiRequest(request: IncomingMessage, response: Serve
       return;
     }
 
+    if (request.method === 'GET' && pathname.startsWith('/api/did/')) {
+      await handleDidDocument(response, decodeURIComponent(pathname.slice('/api/did/'.length)));
+      return;
+    }
+
+    if (request.method === 'GET' && pathname.startsWith('/api/vc/')) {
+      await handleVerifiableCredential(response, decodeURIComponent(pathname.slice('/api/vc/'.length)));
+      return;
+    }
+
     if (request.method === 'GET' && pathname === '/api/logs') {
       await handleLogs(response);
       return;
@@ -1242,6 +1459,8 @@ export function resetApiState(): void {
   issuerSessionsById.clear();
   walletByUserId.clear();
   reportsById.clear();
+  didDocumentsByAccount.clear();
+  verifiableCredentialsById.clear();
   documentVerificationsBySessionId.clear();
   logEvents.splice(0, logEvents.length);
   activeSessionId = null;

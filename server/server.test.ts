@@ -493,6 +493,46 @@ describe('mini Node API', () => {
     });
     expect(sign.text).toContain('2027-11-30T00:00:00.000Z');
     expectNoSecrets(sign.text, [rawForeignRegistrationNumber, organizationName]);
+
+    const did = await apiFetch(`/api/did/${encodeURIComponent(tenantWalletAddress)}`);
+
+    expect(did.response.status).toBe(200);
+    expect(did.json.didDocument).toMatchObject({
+      id: `did:xrpl:testnet:${tenantWalletAddress}`,
+      controller: tenantWalletAddress,
+      proofPurpose: 'nomokdon-housing-trust-pass'
+    });
+    expect(did.json.didDocument).toHaveProperty('service');
+    expect(did.text).toContain('/api/vc/vc_');
+    expect(did.text).toContain(`/api/report/${String(sign.json.reportId)}`);
+    expectNoSecrets(did.text, [rawForeignRegistrationNumber, organizationName]);
+
+    const credentialId = `vc_${String(sign.json.reportId)}`;
+    const vc = await apiFetch(`/api/vc/${encodeURIComponent(credentialId)}`);
+
+    expect(vc.response.status).toBe(200);
+    expect(vc.json.credential).toMatchObject({
+      id: credentialId,
+      type: ['VerifiableCredential', 'nomokdon-visa'],
+      credentialSubject: {
+        id: `did:xrpl:testnet:${tenantWalletAddress}`,
+        walletAddress: tenantWalletAddress,
+        reportId: sign.json.reportId,
+        visa: expect.objectContaining({
+          verified: true,
+          visaType: 'E-9',
+          nationality: 'Kyrgyzstan',
+          expiresAt: '2027-11-30T00:00:00.000Z'
+        }),
+        employment: expect.objectContaining({
+          verified: true,
+          channel: 'school'
+        })
+      }
+    });
+    const credential = vc.json.credential as { evidence: unknown[] };
+    expect(credential.evidence).toHaveLength(2);
+    expectNoSecrets(vc.text, [rawForeignRegistrationNumber, organizationName]);
   });
 
   it('encrypts the in-memory report store and preserves report API responses when configured', async () => {
