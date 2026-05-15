@@ -23,6 +23,8 @@
 
 Issuer console은 발표자가 evidence 상태를 보여주는 운영자 화면입니다. dry run이 기본이며, live submit은 별도 환경이 준비된 경우에만 사용합니다.
 
+문서 업로드 기반 비자/고용 검증은 `POST /api/verification-documents`에서 처리합니다. API 요청/응답, `reviewReasons`, `retention`, `authenticity`, 감사 로그 계약은 `docs/document-verification-api.md`를 기준으로 설명합니다.
+
 ## 3. XRPL 범위
 
 현재 MVP는 XRPL Testnet evidence를 중심으로 합니다. DIDSet, CredentialCreate/Accept, Payment memo, Escrow 관련 데이터는 데모 fixture와 도메인 모듈에서 생성됩니다.
@@ -61,6 +63,7 @@ src/domain/xrplService.ts
 server/server.ts
 scripts/demo-fixtures.json
 docs/demo-script.md
+docs/document-verification-api.md
 docs/demo-video.mp4
 ```
 
