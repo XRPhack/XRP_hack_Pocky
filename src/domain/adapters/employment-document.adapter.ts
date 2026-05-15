@@ -1,5 +1,6 @@
 import type { AdapterResult, VerificationAdapter } from './adapter.interface.js';
 import {
+  buildAuthenticityData,
   createUploadedDocumentHash,
   extractUploadedDocumentText,
   hashOptionalString,
@@ -66,6 +67,10 @@ export const employmentDocumentAdapter: VerificationAdapter<
       : parseEmploymentDocumentText(extracted.text);
     const now = input.now ?? new Date().toISOString();
     const status = resolveStatus(parsed, now);
+    const authenticity = await buildAuthenticityData({
+      documentVerificationCode: normalizeString(parsed.documentVerificationCode),
+      qrVerificationUrl: normalizeString(parsed.qrVerificationUrl)
+    });
 
     return {
       success: status === 'verified',
@@ -79,6 +84,7 @@ export const employmentDocumentAdapter: VerificationAdapter<
         lostAt: normalizeString(parsed.lostAt),
         organizationNameHash: await hashOptionalString(normalizeString(parsed.organizationName)),
         roleOrProgramHash: await hashOptionalString(normalizeString(parsed.roleOrProgram)),
+        authenticity,
         summary: status === 'verified'
           ? 'Uploaded employment document shows an active status.'
           : 'Uploaded employment document is inactive or missing required fields.'

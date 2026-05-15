@@ -20,6 +20,8 @@ export type UploadedVisaDocument = {
   issuer?: string;
   foreignRegistrationNumber?: string;
   foreignRegistrationNumberLast4?: string;
+  documentVerificationCode?: string;
+  qrVerificationUrl?: string;
 };
 
 export type UploadedEmploymentDocument = {
@@ -32,6 +34,18 @@ export type UploadedEmploymentDocument = {
   lostAt?: string;
   issuedAt?: string;
   issuer?: string;
+  documentVerificationCode?: string;
+  qrVerificationUrl?: string;
+};
+
+export type DocumentAuthenticityStatus = 'not-checked' | 'ready' | 'failed';
+
+export type DocumentAuthenticityData = {
+  status: DocumentAuthenticityStatus;
+  verificationCodeHash?: string;
+  qrVerificationUrlHash?: string;
+  method: 'document-code' | 'qr-url' | 'missing';
+  summary: string;
 };
 
 export type ExtractedDocumentText = {
@@ -50,6 +64,7 @@ export type UploadedVisaVerificationData = {
   issuedAt?: string;
   foreignRegistrationNumberLast4?: string;
   foreignRegistrationNumberHash?: string;
+  authenticity: DocumentAuthenticityData;
   summary: string;
 };
 
@@ -63,5 +78,6 @@ export type UploadedEmploymentVerificationData = {
   lostAt?: string;
   organizationNameHash?: string;
   roleOrProgramHash?: string;
+  authenticity: DocumentAuthenticityData;
   summary: string;
 };

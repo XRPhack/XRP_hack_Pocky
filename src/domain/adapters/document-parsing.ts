@@ -1,5 +1,9 @@
 import { createHashAnchor, sha256Hex } from '../hashing.js';
-import type { ExtractedDocumentText, UploadedDocumentPayload } from './document.types.js';
+import type {
+  DocumentAuthenticityData,
+  ExtractedDocumentText,
+  UploadedDocumentPayload
+} from './document.types.js';
 
 export function decodeUploadedDocument(document: UploadedDocumentPayload): string {
   const decoded = Buffer.from(document.base64, 'base64').toString('utf8').trim();
@@ -131,7 +135,16 @@ export function parseVisaDocumentText(text: string): Record<string, string | und
       keyValue.foreignRegistrationNumber ??
       keyValue['외국인등록번호'] ??
       getFirstMatch(text, [/외국인등록번호\s*[:=]?\s*([0-9*-]{7,})/]),
-    foreignRegistrationNumberLast4: keyValue.foreignRegistrationNumberLast4
+    foreignRegistrationNumberLast4: keyValue.foreignRegistrationNumberLast4,
+    documentVerificationCode:
+      keyValue.documentVerificationCode ??
+      keyValue['문서확인번호'] ??
+      keyValue['발급번호'] ??
+      getFirstMatch(text, [/(?:문서확인번호|발급번호)\s*[:=]?\s*([A-Z0-9-]{6,})/i]),
+    qrVerificationUrl:
+      keyValue.qrVerificationUrl ??
+      keyValue['QR검증URL'] ??
+      getFirstMatch(text, [/(https?:\/\/[^\s]+)/])
   };
 }
 
@@ -151,7 +164,16 @@ export function parseEmploymentDocumentText(text: string): Record<string, string
     acquiredAt: keyValue.acquiredAt ?? keyValue['취득일'] ?? keyValue['자격취득일'],
     lostAt: keyValue.lostAt ?? keyValue['상실일'] ?? keyValue['자격상실일'],
     issuedAt: keyValue.issuedAt ?? keyValue['발급일'],
-    issuer: keyValue.issuer ?? keyValue['발급기관']
+    issuer: keyValue.issuer ?? keyValue['발급기관'],
+    documentVerificationCode:
+      keyValue.documentVerificationCode ??
+      keyValue['문서확인번호'] ??
+      keyValue['발급번호'] ??
+      getFirstMatch(text, [/(?:문서확인번호|발급번호)\s*[:=]?\s*([A-Z0-9-]{6,})/i]),
+    qrVerificationUrl:
+      keyValue.qrVerificationUrl ??
+      keyValue['QR검증URL'] ??
+      getFirstMatch(text, [/(https?:\/\/[^\s]+)/])
   };
 }
 
@@ -169,6 +191,38 @@ export async function hashOptionalString(value: string | undefined): Promise<str
   }
 
   return createHashAnchor('uploaded-document-field', normalized);
+}
+
+export async function buildAuthenticityData(input: {
+  documentVerificationCode?: string;
+  qrVerificationUrl?: string;
+}): Promise<DocumentAuthenticityData> {
+  const documentVerificationCode = input.documentVerificationCode?.trim();
+  const qrVerificationUrl = input.qrVerificationUrl?.trim();
+
+  if (documentVerificationCode) {
+    return {
+      status: 'ready',
+      method: 'document-code',
+      verificationCodeHash: await hashOptionalString(documentVerificationCode),
+      summary: 'Document verification code is present; external authenticity check is ready.'
+    };
+  }
+
+  if (qrVerificationUrl) {
+    return {
+      status: 'ready',
+      method: 'qr-url',
+      qrVerificationUrlHash: await hashOptionalString(qrVerificationUrl),
+      summary: 'QR verification URL is present; external authenticity check is ready.'
+    };
+  }
+
+  return {
+    status: 'not-checked',
+    method: 'missing',
+    summary: 'No document verification code or QR verification URL was found.'
+  };
 }
 
 export function getLast4(value: string | undefined): string | undefined {

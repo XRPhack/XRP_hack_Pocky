@@ -32,7 +32,8 @@ describe('uploaded document adapters', () => {
           nationality: 'Kyrgyzstan',
           expiresAt: '2027-11-30T00:00:00.000Z',
           issuer: 'Ministry of Justice Mock',
-          foreignRegistrationNumber: rawForeignRegistrationNumber
+          foreignRegistrationNumber: rawForeignRegistrationNumber,
+          documentVerificationCode: 'MOJ-2027-ABC123'
         })
       }
     });
@@ -44,10 +45,16 @@ describe('uploaded document adapters', () => {
       nationality: 'Kyrgyzstan',
       expiryStatus: 'valid',
       verified: true,
-      foreignRegistrationNumberLast4: '3456'
+      foreignRegistrationNumberLast4: '3456',
+      authenticity: expect.objectContaining({
+        status: 'ready',
+        method: 'document-code'
+      })
     });
     expect(JSON.stringify(result)).not.toContain(rawForeignRegistrationNumber);
+    expect(JSON.stringify(result)).not.toContain('MOJ-2027-ABC123');
     expect(result.data.foreignRegistrationNumberHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(result.data.authenticity.verificationCodeHash).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it('fails an expired uploaded visa document', async () => {
@@ -82,7 +89,8 @@ describe('uploaded document adapters', () => {
           organizationName,
           roleOrProgram: 'International Welding Program',
           acquiredAt: '2025-03-01T00:00:00.000Z',
-          issuer: 'School Mock Registry'
+          issuer: 'School Mock Registry',
+          qrVerificationUrl: 'https://verify.example.test/school/abc'
         })
       }
     });
@@ -90,8 +98,13 @@ describe('uploaded document adapters', () => {
     expect(result.success).toBe(true);
     expect(result.data.status).toBe('verified');
     expect(result.data.verificationChannel).toBe('school');
+    expect(result.data.authenticity).toMatchObject({
+      status: 'ready',
+      method: 'qr-url'
+    });
     expect(result.data.organizationNameHash).toMatch(/^[a-f0-9]{64}$/);
     expect(JSON.stringify(result)).not.toContain(organizationName);
+    expect(JSON.stringify(result)).not.toContain('https://verify.example.test/school/abc');
   });
 
   it('parses visa fields from plain text documents', async () => {
@@ -107,7 +120,8 @@ describe('uploaded document adapters', () => {
           '국적: Kyrgyzstan',
           '만료일: 2027-11-30',
           '발급기관: Ministry of Justice Mock',
-          '외국인등록번호: 900101-5123456'
+          '외국인등록번호: 900101-5123456',
+          '문서확인번호: MOJ-2027-TEXT'
         ].join('\n'))
       }
     });
@@ -117,9 +131,14 @@ describe('uploaded document adapters', () => {
       visaType: 'E-9',
       nationality: 'Kyrgyzstan',
       expiryStatus: 'valid',
-      foreignRegistrationNumberLast4: '3456'
+      foreignRegistrationNumberLast4: '3456',
+      authenticity: expect.objectContaining({
+        status: 'ready',
+        method: 'document-code'
+      })
     });
     expect(JSON.stringify(result)).not.toContain('900101-5123456');
+    expect(JSON.stringify(result)).not.toContain('MOJ-2027-TEXT');
   });
 
   it('parses employment fields from simple text-based PDF content', async () => {
@@ -134,7 +153,8 @@ describe('uploaded document adapters', () => {
           'verificationChannel: employment-insurance',
           'organizationName: Seoul Mobility Parts',
           'acquiredAt: 2025-03-01',
-          'issuer: Korea Workers Compensation Mock'
+          'issuer: Korea Workers Compensation Mock',
+          'documentVerificationCode: EI-2026-PDF'
         ])
       }
     });
@@ -142,8 +162,13 @@ describe('uploaded document adapters', () => {
     expect(result.success).toBe(true);
     expect(result.data).toMatchObject({
       verificationChannel: 'employment-insurance',
-      status: 'verified'
+      status: 'verified',
+      authenticity: expect.objectContaining({
+        status: 'ready',
+        method: 'document-code'
+      })
     });
     expect(JSON.stringify(result)).not.toContain('Seoul Mobility Parts');
+    expect(JSON.stringify(result)).not.toContain('EI-2026-PDF');
   });
 });

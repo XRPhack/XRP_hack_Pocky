@@ -430,6 +430,8 @@ describe('mini Node API', () => {
     const tenantWalletAddress = Wallet.generate().classicAddress;
     const rawForeignRegistrationNumber = '900101-5123456';
     const organizationName = 'Busan Technical College';
+    const visaDocumentVerificationCode = 'MOJ-2027-API';
+    const employmentQrVerificationUrl = 'https://verify.example.test/employment/abc';
     const auth = await postJson('/api/auth/toss-mock', {
       userId: 'user-doc-upload',
       name: 'Document Tenant',
@@ -450,7 +452,8 @@ describe('mini Node API', () => {
             nationality: 'Kyrgyzstan',
             expiresAt: '2027-11-30T00:00:00.000Z',
             issuer: 'Ministry of Justice Mock',
-            foreignRegistrationNumber: rawForeignRegistrationNumber
+            foreignRegistrationNumber: rawForeignRegistrationNumber,
+            documentVerificationCode: visaDocumentVerificationCode
           })
         },
         employmentDocument: {
@@ -461,7 +464,8 @@ describe('mini Node API', () => {
             organizationName,
             roleOrProgram: 'International Welding Program',
             acquiredAt: '2025-03-01T00:00:00.000Z',
-            issuer: 'School Mock Registry'
+            issuer: 'School Mock Registry',
+            qrVerificationUrl: employmentQrVerificationUrl
           })
         }
       },
@@ -475,7 +479,24 @@ describe('mini Node API', () => {
       visa: expect.objectContaining({ success: true }),
       employment: expect.objectContaining({ success: true })
     });
-    expectNoSecrets(upload.text, [rawForeignRegistrationNumber, organizationName]);
+    expect(upload.json).toMatchObject({
+      visa: expect.objectContaining({
+        data: expect.objectContaining({
+          authenticity: expect.objectContaining({ status: 'ready', method: 'document-code' })
+        })
+      }),
+      employment: expect.objectContaining({
+        data: expect.objectContaining({
+          authenticity: expect.objectContaining({ status: 'ready', method: 'qr-url' })
+        })
+      })
+    });
+    expectNoSecrets(upload.text, [
+      rawForeignRegistrationNumber,
+      organizationName,
+      visaDocumentVerificationCode,
+      employmentQrVerificationUrl
+    ]);
 
     const sign = await postJson(
       '/api/sign-and-submit',
@@ -499,7 +520,12 @@ describe('mini Node API', () => {
       employment: expect.objectContaining({ success: true })
     });
     expect(sign.text).toContain('2027-11-30T00:00:00.000Z');
-    expectNoSecrets(sign.text, [rawForeignRegistrationNumber, organizationName]);
+    expectNoSecrets(sign.text, [
+      rawForeignRegistrationNumber,
+      organizationName,
+      visaDocumentVerificationCode,
+      employmentQrVerificationUrl
+    ]);
 
     const did = await apiFetch(`/api/did/${encodeURIComponent(tenantWalletAddress)}`);
 
@@ -512,7 +538,12 @@ describe('mini Node API', () => {
     expect(did.json.didDocument).toHaveProperty('service');
     expect(did.text).toContain('/api/vc/vc_');
     expect(did.text).toContain(`/api/report/${String(sign.json.reportId)}`);
-    expectNoSecrets(did.text, [rawForeignRegistrationNumber, organizationName]);
+    expectNoSecrets(did.text, [
+      rawForeignRegistrationNumber,
+      organizationName,
+      visaDocumentVerificationCode,
+      employmentQrVerificationUrl
+    ]);
 
     const credentialId = `vc_${String(sign.json.reportId)}`;
     const vc = await apiFetch(`/api/vc/${encodeURIComponent(credentialId)}`);
@@ -529,17 +560,30 @@ describe('mini Node API', () => {
           verified: true,
           visaType: 'E-9',
           nationality: 'Kyrgyzstan',
-          expiresAt: '2027-11-30T00:00:00.000Z'
+          expiresAt: '2027-11-30T00:00:00.000Z',
+          authenticity: expect.objectContaining({
+            status: 'ready',
+            method: 'document-code'
+          })
         }),
         employment: expect.objectContaining({
           verified: true,
-          channel: 'school'
+          channel: 'school',
+          authenticity: expect.objectContaining({
+            status: 'ready',
+            method: 'qr-url'
+          })
         })
       }
     });
     const credential = vc.json.credential as { evidence: unknown[] };
     expect(credential.evidence).toHaveLength(2);
-    expectNoSecrets(vc.text, [rawForeignRegistrationNumber, organizationName]);
+    expectNoSecrets(vc.text, [
+      rawForeignRegistrationNumber,
+      organizationName,
+      visaDocumentVerificationCode,
+      employmentQrVerificationUrl
+    ]);
 
     const employmentCredentialId = `${credentialId}_employment`;
     const employmentVc = await apiFetch(`/api/vc/${encodeURIComponent(employmentCredentialId)}`);
@@ -552,11 +596,20 @@ describe('mini Node API', () => {
         id: `did:xrpl:testnet:${tenantWalletAddress}`,
         employment: expect.objectContaining({
           verified: true,
-          channel: 'school'
+          channel: 'school',
+          authenticity: expect.objectContaining({
+            status: 'ready',
+            method: 'qr-url'
+          })
         })
       }
     });
-    expectNoSecrets(employmentVc.text, [rawForeignRegistrationNumber, organizationName]);
+    expectNoSecrets(employmentVc.text, [
+      rawForeignRegistrationNumber,
+      organizationName,
+      visaDocumentVerificationCode,
+      employmentQrVerificationUrl
+    ]);
   });
 
   it('encrypts the in-memory report store and preserves report API responses when configured', async () => {

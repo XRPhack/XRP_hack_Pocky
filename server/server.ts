@@ -101,11 +101,13 @@ type StoredVerifiableCredential = {
       nationality: string;
       expiresAt: string;
       evidenceHash?: string;
+      authenticity: UploadedVisaVerificationData['authenticity'];
     };
     employment?: {
       verified: boolean;
       channel: string;
       evidenceHash?: string;
+      authenticity: UploadedEmploymentVerificationData['authenticity'];
     };
     reportId: string;
   };
@@ -767,14 +769,16 @@ function createVerifiableCredential({
             visaType: documentVerification.visa.data.visaType,
             nationality: documentVerification.visa.data.nationality,
             expiresAt: documentVerification.visa.data.expiresAt,
-            evidenceHash: documentVerification.visa.evidenceHash
+            evidenceHash: documentVerification.visa.evidenceHash,
+            authenticity: documentVerification.visa.data.authenticity
           }
         : undefined,
       employment: documentVerification?.employment
         ? {
             verified: documentVerification.employment.success,
             channel: documentVerification.employment.data.verificationChannel,
-            evidenceHash: documentVerification.employment.evidenceHash
+            evidenceHash: documentVerification.employment.evidenceHash,
+            authenticity: documentVerification.employment.data.authenticity
           }
         : undefined,
       reportId

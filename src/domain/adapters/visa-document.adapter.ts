@@ -1,5 +1,6 @@
 import type { AdapterResult, VerificationAdapter } from './adapter.interface.js';
 import {
+  buildAuthenticityData,
   createUploadedDocumentHash,
   extractUploadedDocumentText,
   getLast4,
@@ -54,6 +55,10 @@ export const visaDocumentAdapter: VerificationAdapter<
     const expiryStatus = resolveExpiryStatus(expiresAt, now);
     const verified = expiryStatus === 'valid' && visaType !== 'unknown';
     const foreignRegistrationNumber = normalizeString(parsed.foreignRegistrationNumber);
+    const authenticity = await buildAuthenticityData({
+      documentVerificationCode: normalizeString(parsed.documentVerificationCode),
+      qrVerificationUrl: normalizeString(parsed.qrVerificationUrl)
+    });
 
     return {
       success: verified,
@@ -69,6 +74,7 @@ export const visaDocumentAdapter: VerificationAdapter<
         foreignRegistrationNumberLast4:
           normalizeString(parsed.foreignRegistrationNumberLast4) ?? getLast4(foreignRegistrationNumber),
         foreignRegistrationNumberHash: await hashOptionalString(foreignRegistrationNumber),
+        authenticity,
         summary: verified
           ? 'Uploaded visa document has a future expiry date.'
           : 'Uploaded visa document is expired or missing required fields.'
