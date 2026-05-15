@@ -69,6 +69,10 @@ function asBase64Json(value: unknown): string {
   return Buffer.from(JSON.stringify(value), 'utf8').toString('base64');
 }
 
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
 function expectNoSecrets(text: string, secrets: string[]): void {
   for (const secret of secrets) {
     expect(text).not.toContain(secret);
@@ -663,6 +667,142 @@ describe('mini Node API', () => {
     });
     expect(upload.text).toContain('Scanned images and image-only PDFs need manual review or OCR first.');
     expect(upload.text).not.toContain('png scan placeholder');
+  });
+
+  it('replaces previous document verification data on re-upload', async () => {
+    const auth = await postJson('/api/auth/toss-mock', {
+      userId: 'user-doc-reupload',
+      name: 'Reupload Tenant',
+      phone: '+82-10-5555-5656'
+    });
+    const sessionId = String(auth.json.sessionId);
+    const firstUpload = await postJson(
+      '/api/verification-documents',
+      {
+        sessionId,
+        visaDocument: {
+          filename: 'expired-visa.json',
+          mimeType: 'application/json',
+          base64: asBase64Json({
+            visaType: 'E-9',
+            nationality: 'Kyrgyzstan',
+            expiresAt: '2024-01-01T00:00:00.000Z',
+            documentVerificationCode: 'MOJ-OLD-DOC'
+          })
+        }
+      },
+      { 'x-session-id': sessionId }
+    );
+
+    expect(firstUpload.response.status).toBe(201);
+    expect(firstUpload.json).toMatchObject({
+      status: 'review-needed',
+      retention: expect.objectContaining({ replacedPrevious: false }),
+      visa: expect.objectContaining({ success: false })
+    });
+
+    const secondUpload = await postJson(
+      '/api/verification-documents',
+      {
+        sessionId,
+        visaDocument: {
+          filename: 'valid-visa.json',
+          mimeType: 'application/json',
+          base64: asBase64Json({
+            visaType: 'E-9',
+            nationality: 'Kyrgyzstan',
+            expiresAt: '2027-11-30T00:00:00.000Z',
+            documentVerificationCode: 'MOJ-NEW-DOC'
+          })
+        }
+      },
+      { 'x-session-id': sessionId }
+    );
+
+    expect(secondUpload.response.status).toBe(201);
+    expect(secondUpload.json).toMatchObject({
+      status: 'verified',
+      retention: expect.objectContaining({ replacedPrevious: true }),
+      visa: expect.objectContaining({ success: true })
+    });
+
+    const sign = await postJson(
+      '/api/sign-and-submit',
+      { sessionId, dryRun: true },
+      { 'x-session-id': sessionId }
+    );
+
+    expect(sign.response.status).toBe(200);
+    expect(sign.json.report).toMatchObject({
+      authenticityChecks: [
+        expect.objectContaining({ id: 'visa-document', status: 'ready', method: 'document-code' })
+      ],
+      badges: expect.arrayContaining([
+        expect.objectContaining({ id: 'visa-valid', status: 'pass' })
+      ])
+    });
+    expect(sign.text).toContain('2027-11-30T00:00:00.000Z');
+    expect(sign.text).not.toContain('MOJ-OLD-DOC');
+    expect(sign.text).not.toContain('MOJ-NEW-DOC');
+  });
+
+  it('expires uploaded document verification data before credential issuance', async () => {
+    process.env.DOCUMENT_VERIFICATION_TTL_MS = '1';
+    const auth = await postJson('/api/auth/toss-mock', {
+      userId: 'user-doc-expiry',
+      name: 'Expiry Tenant',
+      phone: '+82-10-5555-7878'
+    });
+    const sessionId = String(auth.json.sessionId);
+    const upload = await postJson(
+      '/api/verification-documents',
+      {
+        sessionId,
+        visaDocument: {
+          filename: 'valid-visa.json',
+          mimeType: 'application/json',
+          base64: asBase64Json({
+            visaType: 'E-9',
+            nationality: 'Kyrgyzstan',
+            expiresAt: '2027-11-30T00:00:00.000Z',
+            documentVerificationCode: 'MOJ-EXPIRING-DOC'
+          })
+        }
+      },
+      { 'x-session-id': sessionId }
+    );
+
+    expect(upload.response.status).toBe(201);
+    expect(upload.json).toMatchObject({
+      status: 'verified',
+      retention: expect.objectContaining({ ttlMs: 1 })
+    });
+
+    await delay(5);
+    const sign = await postJson(
+      '/api/sign-and-submit',
+      { sessionId, dryRun: true },
+      { 'x-session-id': sessionId }
+    );
+
+    expect(sign.response.status).toBe(200);
+    expect(sign.json.report).toMatchObject({
+      authenticityChecks: []
+    });
+    expect(sign.json.documentVerification).toBeUndefined();
+    expect(sign.text).not.toContain('MOJ-EXPIRING-DOC');
+
+    const logs = await apiFetch('/api/logs');
+    expect(logs.json.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'document.verification',
+        status: 'expired',
+        details: expect.objectContaining({
+          hadVisa: true,
+          hadEmployment: false
+        })
+      })
+    ]));
   });
 
   it('encrypts the in-memory report store and preserves report API responses when configured', async () => {

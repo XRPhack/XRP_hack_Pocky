@@ -21,6 +21,12 @@ export type WizardDocumentReviewReason = {
   action: string;
 };
 
+export type WizardDocumentRetention = {
+  expiresAt: string;
+  ttlMs: number;
+  replacedPrevious: boolean;
+};
+
 type WizardDocumentVerificationResult = {
   success: boolean;
   source: string;
@@ -40,6 +46,7 @@ export type WizardDocumentVerificationSummary = {
   visa?: WizardDocumentVerificationResult;
   employment?: WizardDocumentVerificationResult;
   reviewReasons: WizardDocumentReviewReason[];
+  retention?: WizardDocumentRetention;
 };
 
 type WizardScreenProps = {
@@ -311,6 +318,7 @@ function createDocumentVerificationSummary(
   if (summary.reviewReasons.length > 0) {
     list.appendChild(createDocumentReviewReasons(summary.reviewReasons, locale));
   }
+  appendChildren(list, createDocumentRetention(summary.retention, locale));
 
   return list;
 }
@@ -342,6 +350,31 @@ function createDocumentReviewReasons(reasons: WizardDocumentReviewReason[], loca
   );
 
   return panel;
+}
+
+function formatRetentionExpiresAt(value: string, locale: Locale): string {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat(locale === 'ko' ? 'ko-KR' : 'en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  }).format(date);
+}
+
+function createDocumentRetention(retention: WizardDocumentRetention | undefined, locale: Locale): HTMLElement | null {
+  if (!retention) {
+    return null;
+  }
+
+  return createTextElement(
+    'p',
+    'tenant-wizard-document-retention',
+    t('tenantWizardDocumentRetention', locale).replace('{expiresAt}', formatRetentionExpiresAt(retention.expiresAt, locale))
+  );
 }
 
 function createDocumentAuthenticity(authenticity: WizardDocumentAuthenticity, locale: Locale): HTMLElement {

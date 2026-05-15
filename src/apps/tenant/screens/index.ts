@@ -7,6 +7,7 @@ export {
   WizardScreen,
   type TenantWizardFixtureId,
   type WizardDocumentAuthenticity,
+  type WizardDocumentRetention,
   type WizardDocumentReviewReason,
   type WizardDocumentVerificationSummary,
   type WizardStepStatus

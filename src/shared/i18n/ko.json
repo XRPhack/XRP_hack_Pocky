@@ -86,6 +86,7 @@
   "tenantWizardDocumentAuthenticityReady": "진위확인 준비 완료",
   "tenantWizardDocumentAuthenticityNotChecked": "진위확인 미확인",
   "tenantWizardDocumentAuthenticityFailed": "진위확인 실패",
+  "tenantWizardDocumentRetention": "업로드 검증 데이터는 {expiresAt}에 만료됩니다. 다시 업로드하면 이전 결과는 대체됩니다.",
   "tenantWizardDocumentErrorCopy": "서류 검증을 완료하지 못했습니다. 로컬 API를 확인한 뒤 다시 시도해 주세요.",
   "tenantWizardDocumentReviewTitle": "서류 검토 필요",
   "tenantWizardDocumentReviewCopy": "제출된 서류 근거가 검증을 통과하지 못해 Credential 발급을 중단했습니다.",

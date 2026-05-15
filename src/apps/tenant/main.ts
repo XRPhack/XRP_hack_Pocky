@@ -20,6 +20,7 @@ import {
   type LoginStatus,
   type TenantWizardFixtureId,
   type WizardDocumentAuthenticity,
+  type WizardDocumentRetention,
   type WizardDocumentReviewReason,
   type WizardDocumentVerificationSummary,
   type WizardStepStatus
@@ -422,8 +423,25 @@ function parseDocumentVerificationSummary(payload: unknown): WizardDocumentVerif
   return {
     visa: parseResult('visa'),
     employment: parseResult('employment'),
-    reviewReasons: parseDocumentReviewReasons(verificationPayload.reviewReasons)
+    reviewReasons: parseDocumentReviewReasons(verificationPayload.reviewReasons),
+    retention: parseDocumentRetention(verificationPayload.retention)
   };
+}
+
+function parseDocumentRetention(value: unknown): WizardDocumentRetention | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const expiresAt = getString(value.expiresAt);
+  const ttlMs = value.ttlMs;
+  const replacedPrevious = value.replacedPrevious;
+
+  if (!expiresAt || typeof ttlMs !== 'number' || typeof replacedPrevious !== 'boolean') {
+    return undefined;
+  }
+
+  return { expiresAt, ttlMs, replacedPrevious };
 }
 
 function parseDocumentReviewReasons(value: unknown): WizardDocumentReviewReason[] {

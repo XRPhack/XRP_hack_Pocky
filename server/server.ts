@@ -42,11 +42,11 @@ type TenantWalletMapping = {
 
 type LogEvent = {
   id: string;
-  type: 'auth.toss-mock' | 'issuer.sign-and-submit' | 'issuer.simulator' | 'landlord.verify-confirmed';
+  type: 'auth.toss-mock' | 'document.verification' | 'issuer.sign-and-submit' | 'issuer.simulator' | 'landlord.verify-confirmed';
   createdAt: string;
   sessionId?: string;
   userId?: string;
-  status: 'created' | 'dry-run' | 'submitted' | 'confirmed' | 'validated' | 'failed' | 'error';
+  status: 'created' | 'dry-run' | 'submitted' | 'confirmed' | 'validated' | 'failed' | 'error' | 'expired';
   details: unknown;
 };
 
@@ -128,6 +128,7 @@ type DocumentVerificationRecord = {
   sessionId: string;
   subjectId: string;
   createdAt: string;
+  expiresAt: string;
   visa?: {
     success: boolean;
     source: string;
@@ -207,6 +208,7 @@ const LOG_ID_PREFIX = 'log_';
 const REPORT_ID_PREFIX = 'report_';
 const DEFAULT_ISSUER_ADDRESS = 'rNomokDonIssuerDryRunOnly';
 const MAX_BODY_BYTES = 10_000_000;
+const DOCUMENT_VERIFICATION_TTL_MS = 30 * 60 * 1000;
 const VC_ENCRYPTION_ALGORITHM = 'aes-256-gcm';
 const VC_ENCRYPTION_KEY_BYTES = 32;
 const VC_ENCRYPTION_IV_BYTES = 12;
@@ -311,6 +313,36 @@ function isVcEncryptionConfigured(): boolean {
 
 function nowIso(): string {
   return new Date().toISOString();
+}
+
+function resolveDocumentVerificationTtlMs(): number {
+  const configured = Number(process.env.DOCUMENT_VERIFICATION_TTL_MS);
+
+  if (Number.isFinite(configured) && configured > 0) {
+    return configured;
+  }
+
+  return DOCUMENT_VERIFICATION_TTL_MS;
+}
+
+function addMilliseconds(value: string, milliseconds: number): string {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return new Date(Date.now() + milliseconds).toISOString();
+  }
+
+  return new Date(date.getTime() + milliseconds).toISOString();
+}
+
+function isExpiredTimestamp(value: string, now = Date.now()): boolean {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return true;
+  }
+
+  return date.getTime() <= now;
 }
 
 function isRecord(value: unknown): value is JsonObject {
@@ -481,6 +513,37 @@ function getCurrentSession(request: IncomingMessage, url: URL, body?: JsonObject
     sessionId,
     session: sessionsById.get(sessionId) ?? null
   };
+}
+
+function getDocumentVerificationForSession(sessionId: string | undefined): DocumentVerificationRecord | undefined {
+  if (!sessionId) {
+    return undefined;
+  }
+
+  const record = documentVerificationsBySessionId.get(sessionId);
+
+  if (!record) {
+    return undefined;
+  }
+
+  if (!isExpiredTimestamp(record.expiresAt)) {
+    return record;
+  }
+
+  documentVerificationsBySessionId.delete(sessionId);
+  appendLog({
+    type: 'document.verification',
+    sessionId,
+    userId: record.subjectId,
+    status: 'expired',
+    details: {
+      createdAt: record.createdAt,
+      expiresAt: record.expiresAt,
+      hadVisa: Boolean(record.visa),
+      hadEmployment: Boolean(record.employment)
+    }
+  });
+  return undefined;
 }
 
 async function readJsonBody(request: IncomingMessage): Promise<JsonObject> {
@@ -987,6 +1050,7 @@ async function handleVerificationDocuments(
 
   const subjectId = normalizeString(body.subjectId) ?? session?.userId ?? sessionId ?? 'tenant-local';
   const createdAt = nowIso();
+  const expiresAt = addMilliseconds(createdAt, resolveDocumentVerificationTtlMs());
   const visaDocument = normalizeUploadedDocumentPayload(body.visaDocument);
   const employmentDocument = normalizeUploadedDocumentPayload(body.employmentDocument);
 
@@ -998,9 +1062,11 @@ async function handleVerificationDocuments(
   const record: DocumentVerificationRecord = {
     sessionId: sessionId ?? `subject:${subjectId}`,
     subjectId,
-    createdAt
+    createdAt,
+    expiresAt
   };
   const reviewReasons: DocumentReviewReason[] = [];
+  const replacedPrevious = documentVerificationsBySessionId.has(record.sessionId);
 
   if (visaDocument) {
     try {
@@ -1047,17 +1113,42 @@ async function handleVerificationDocuments(
   }
 
   documentVerificationsBySessionId.set(record.sessionId, record);
+  const status =
+    (record.visa ? record.visa.success : true) &&
+    (record.employment ? record.employment.success : true) &&
+    reviewReasons.length === 0
+      ? 'verified'
+      : 'review-needed';
+  appendLog({
+    type: 'document.verification',
+    sessionId: record.sessionId,
+    userId: subjectId,
+    status: status === 'verified' ? 'validated' : 'failed',
+    details: {
+      verificationId: record.sessionId,
+      status,
+      createdAt,
+      expiresAt,
+      ttlMs: resolveDocumentVerificationTtlMs(),
+      replacedPrevious,
+      reviewReasonCodes: reviewReasons.map((reason) => reason.code),
+      uploaded: {
+        visa: Boolean(visaDocument),
+        employment: Boolean(employmentDocument)
+      }
+    }
+  });
 
   sendJson(response, 201, {
     ok: true,
     verificationId: record.sessionId,
     subjectId,
-    status:
-      (record.visa ? record.visa.success : true) &&
-      (record.employment ? record.employment.success : true) &&
-      reviewReasons.length === 0
-        ? 'verified'
-        : 'review-needed',
+    status,
+    retention: {
+      expiresAt,
+      ttlMs: resolveDocumentVerificationTtlMs(),
+      replacedPrevious
+    },
     reviewReasons,
     visa: record.visa,
     employment: record.employment
@@ -1083,7 +1174,7 @@ async function handleSignAndSubmit(request: IncomingMessage, response: ServerRes
   const monthlyRentKrw = toNumber(body.monthlyRentKrw, 650_000);
   const dryRunRequested = body.dryRun !== false;
   const issuedAt = nowIso();
-  const documentVerification = sessionId ? documentVerificationsBySessionId.get(sessionId) : undefined;
+  const documentVerification = getDocumentVerificationForSession(sessionId);
   const credentials = createCredentialDescriptors(credentialId);
   const expiration =
     normalizeString(body.expiration) ??
