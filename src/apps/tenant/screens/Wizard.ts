@@ -5,6 +5,21 @@ import { appendChildren, createTextElement, cx, type UiChild } from '../../../sh
 
 export type WizardStepStatus = 'idle' | 'loading' | 'success' | 'error';
 export type TenantWizardFixtureId = 'happy' | 'edge';
+type WizardDocumentAuthenticityStatus = 'not-checked' | 'ready' | 'failed';
+
+export type WizardDocumentAuthenticity = {
+  status: WizardDocumentAuthenticityStatus;
+  method: 'document-code' | 'qr-url' | 'missing';
+  summary: string;
+};
+
+type WizardDocumentVerificationResult = {
+  success: boolean;
+  source: string;
+  evidenceHash: string;
+  summary: string;
+  authenticity?: WizardDocumentAuthenticity;
+};
 
 type WizardStepState = {
   status: WizardStepStatus;
@@ -14,18 +29,8 @@ type WizardStepState = {
 };
 
 export type WizardDocumentVerificationSummary = {
-  visa?: {
-    success: boolean;
-    source: string;
-    evidenceHash: string;
-    summary: string;
-  };
-  employment?: {
-    success: boolean;
-    source: string;
-    evidenceHash: string;
-    summary: string;
-  };
+  visa?: WizardDocumentVerificationResult;
+  employment?: WizardDocumentVerificationResult;
 };
 
 type WizardScreenProps = {
@@ -276,6 +281,9 @@ function createDocumentVerificationSummary(
       'tenant-wizard-document-result__meta',
       `${result.source} · ${t('tenantWizardDocumentEvidenceHash', locale)} ${result.evidenceHash.slice(0, 12)}...`
     );
+    const authenticity = result.authenticity
+      ? createDocumentAuthenticity(result.authenticity, locale)
+      : null;
 
     appendChildren(
       item,
@@ -285,12 +293,35 @@ function createDocumentVerificationSummary(
         variant: result.success ? 'success' : 'warning'
       }),
       createTextElement('p', 'tenant-wizard-document-result__summary', result.summary),
+      authenticity,
       meta
     );
     list.appendChild(item);
   }
 
   return list;
+}
+
+function createDocumentAuthenticity(authenticity: WizardDocumentAuthenticity, locale: Locale): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'tenant-wizard-document-result__authenticity';
+
+  const statusKey = authenticity.status === 'ready'
+    ? 'tenantWizardDocumentAuthenticityReady'
+    : authenticity.status === 'failed'
+      ? 'tenantWizardDocumentAuthenticityFailed'
+      : 'tenantWizardDocumentAuthenticityNotChecked';
+
+  appendChildren(
+    wrapper,
+    Badge({
+      label: t(statusKey, locale),
+      variant: authenticity.status === 'ready' ? 'success' : authenticity.status === 'failed' ? 'error' : 'warning'
+    }),
+    createTextElement('span', 'tenant-wizard-document-result__authenticity-summary', authenticity.summary)
+  );
+
+  return wrapper;
 }
 
 function createFixtureSelector(

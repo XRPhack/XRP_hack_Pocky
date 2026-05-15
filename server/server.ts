@@ -15,7 +15,7 @@ import type {
 import { rentLedgerEdgeCase, rentLedgerHappyCase } from '../src/domain/adapters/rent-ledger.fixture.js';
 import { visaEdgeCase, visaHappyCase } from '../src/domain/adapters/visa.fixture.js';
 import { visaDocumentAdapter } from '../src/domain/adapters/visa-document.adapter.js';
-import { buildReport, type BuiltReport, type ReportRentPayment } from '../src/domain/report.js';
+import { buildReport, type BuiltReport, type ReportAuthenticityCheck, type ReportRentPayment } from '../src/domain/report.js';
 import { buildCredentialAccept, buildCredentialCreate, submitCreate } from '../src/domain/xrplCredential.js';
 import { buildDidSet } from '../src/domain/xrplDid.js';
 import { buildRentPayment } from '../src/domain/xrplPayment.js';
@@ -808,6 +808,32 @@ function createCredentialDescriptors(requestedCredentialId: string): {
   };
 }
 
+function createReportAuthenticityChecks(documentVerification?: DocumentVerificationRecord): ReportAuthenticityCheck[] {
+  const checks: ReportAuthenticityCheck[] = [];
+
+  if (documentVerification?.visa) {
+    checks.push({
+      id: 'visa-document',
+      label: 'Visa document authenticity',
+      status: documentVerification.visa.data.authenticity.status,
+      method: documentVerification.visa.data.authenticity.method,
+      summary: documentVerification.visa.data.authenticity.summary
+    });
+  }
+
+  if (documentVerification?.employment) {
+    checks.push({
+      id: 'employment-document',
+      label: 'Employment or school document authenticity',
+      status: documentVerification.employment.data.authenticity.status,
+      method: documentVerification.employment.data.authenticity.method,
+      summary: documentVerification.employment.data.authenticity.summary
+    });
+  }
+
+  return checks;
+}
+
 async function handleHealth(response: ServerResponse): Promise<void> {
   const issuerConfig = resolveIssuerConfig(process.env);
 
@@ -1081,7 +1107,8 @@ async function handleSignAndSubmit(request: IncomingMessage, response: ServerRes
         { type: 'visa', status: visaStatus, credentialId: credentials.visa.id },
         { type: 'employment', status: employmentStatus, credentialId: credentials.employment.id }
       ],
-      anchors: [escrowDraft.contractHash, ...documentAnchors]
+      anchors: [escrowDraft.contractHash, ...documentAnchors],
+      authenticityChecks: createReportAuthenticityChecks(documentVerification)
     },
     escrowState: {
       state: 'ready-to-sign',

@@ -510,6 +510,10 @@ describe('mini Node API', () => {
 
     expect(sign.response.status).toBe(200);
     expect(sign.json.report).toMatchObject({
+      authenticityChecks: expect.arrayContaining([
+        expect.objectContaining({ id: 'visa-document', status: 'ready', method: 'document-code' }),
+        expect.objectContaining({ id: 'employment-document', status: 'ready', method: 'qr-url' })
+      ]),
       badges: expect.arrayContaining([
         expect.objectContaining({ id: 'visa-valid', status: 'pass' }),
         expect.objectContaining({ id: 'employment-confirmed', status: 'pass' })

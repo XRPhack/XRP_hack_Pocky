@@ -19,6 +19,7 @@ import {
   type DashboardTrustGrade,
   type LoginStatus,
   type TenantWizardFixtureId,
+  type WizardDocumentAuthenticity,
   type WizardDocumentVerificationSummary,
   type WizardStepStatus
 } from './screens';
@@ -131,6 +132,14 @@ function isDashboardBadgeStatus(value: unknown): value is DashboardBadgeStatus {
 
 function isDashboardTrustGrade(value: unknown): value is DashboardTrustGrade {
   return value === 'A' || value === 'B' || value === 'C' || value === 'D';
+}
+
+function isDocumentAuthenticityStatus(value: unknown): value is WizardDocumentAuthenticity['status'] {
+  return value === 'not-checked' || value === 'ready' || value === 'failed';
+}
+
+function isDocumentAuthenticityMethod(value: unknown): value is WizardDocumentAuthenticity['method'] {
+  return value === 'document-code' || value === 'qr-url' || value === 'missing';
 }
 
 function clearDashboardReport(): void {
@@ -301,7 +310,8 @@ function createFixtureDocument(kind: 'visa' | 'employment'): { filename: string;
         nationality: visaInput.nationality,
         expiresAt: visaInput.expiresAt,
         issuer: visaInput.issuer,
-        foreignRegistrationNumberLast4: visaInput.passportNumberLast4
+        foreignRegistrationNumberLast4: visaInput.passportNumberLast4,
+        documentVerificationCode: state.selectedFixtureId === 'edge' ? 'MOJ-2024-EDGE9934' : 'MOJ-2027-HAPPY4821'
       }
     : {
         documentType: 'employment-confirmation',
@@ -311,7 +321,8 @@ function createFixtureDocument(kind: 'visa' | 'employment'): { filename: string;
         roleOrProgram: employmentInput.roleOrProgram,
         acquiredAt: employmentInput.enrollmentVerified || employmentInput.employmentVerified ? '2025-03-01T00:00:00.000Z' : undefined,
         lostAt: employmentInput.enrollmentVerified || employmentInput.employmentVerified ? undefined : '2025-12-31T00:00:00.000Z',
-        issuer: `${employmentInput.verificationChannel}-mock-registry`
+        issuer: `${employmentInput.verificationChannel}-mock-registry`,
+        qrVerificationUrl: `https://verify.example.test/${employmentInput.verificationChannel}/${state.selectedFixtureId}`
       };
 
   return {
@@ -381,6 +392,7 @@ function parseDocumentVerificationSummary(payload: unknown): WizardDocumentVerif
     const source = getString(result.source);
     const evidenceHash = getString(result.evidenceHash);
     const summary = getString(result.data.summary);
+    const authenticity = parseDocumentAuthenticity(result.data.authenticity);
 
     if (!source || !evidenceHash || !summary) {
       return undefined;
@@ -390,7 +402,8 @@ function parseDocumentVerificationSummary(payload: unknown): WizardDocumentVerif
       success: result.success === true,
       source,
       evidenceHash,
-      summary
+      summary,
+      authenticity
     };
   }
 
@@ -398,6 +411,22 @@ function parseDocumentVerificationSummary(payload: unknown): WizardDocumentVerif
     visa: parseResult('visa'),
     employment: parseResult('employment')
   };
+}
+
+function parseDocumentAuthenticity(value: unknown): WizardDocumentAuthenticity | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const status = value.status;
+  const method = value.method;
+  const summary = getString(value.summary);
+
+  if (!isDocumentAuthenticityStatus(status) || !isDocumentAuthenticityMethod(method) || !summary) {
+    return undefined;
+  }
+
+  return { status, method, summary };
 }
 
 function parseDryRunReport(payload: unknown): {

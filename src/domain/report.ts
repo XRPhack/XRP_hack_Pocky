@@ -19,6 +19,16 @@ export type ReportBadge = {
   evidence: string;
 };
 
+export type ReportAuthenticityStatus = 'not-checked' | 'ready' | 'failed';
+
+export type ReportAuthenticityCheck = {
+  id: 'visa-document' | 'employment-document';
+  label: string;
+  status: ReportAuthenticityStatus;
+  method: 'document-code' | 'qr-url' | 'missing';
+  summary: string;
+};
+
 export type ReportEscrowState = {
   state: 'ready-to-sign' | 'submitted' | 'locked' | 'release-ready' | 'cancel-ready' | 'cancelled' | 'missing';
   amountXrp?: number;
@@ -51,6 +61,7 @@ export type CompactReportVp = Partial<CompactVp> & {
     status?: VerificationStatus;
     credentialId?: string;
   }>;
+  authenticityChecks?: ReportAuthenticityCheck[];
 };
 
 export type BuildReportInput = {
@@ -65,6 +76,7 @@ export type BuiltReport = {
   holderId: string;
   trustGrade: ReportTrustGrade;
   badges: [ReportBadge, ReportBadge, ReportBadge, ReportBadge, ReportBadge, ReportBadge];
+  authenticityChecks: ReportAuthenticityCheck[];
   generatedAt: string;
 };
 
@@ -326,6 +338,7 @@ export function buildReport({
     holderId: getHolderId(vp),
     trustGrade: calculateTrustGrade(badges),
     badges,
+    authenticityChecks: (vp as CompactReportVp).authenticityChecks ?? [],
     generatedAt: toIsoTimestamp(generatedAt)
   };
 }

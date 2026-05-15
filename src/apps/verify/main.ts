@@ -9,6 +9,7 @@ import {
   VerifyLoadingScreen,
   VerifyResultScreen,
   getFixtureEvidenceLinks,
+  type VerifyAuthenticityCheck,
   type VerifyBadge,
   type VerifyConfirmationStatus,
   type VerifyEvidenceLink,
@@ -18,6 +19,8 @@ import {
 type JsonRecord = Record<string, unknown>;
 type VerifyBadgeStatus = VerifyBadge['status'];
 type VerifyTrustGrade = VerifyReport['trustGrade'];
+type VerifyAuthenticityStatus = VerifyAuthenticityCheck['status'];
+type VerifyAuthenticityMethod = VerifyAuthenticityCheck['method'];
 
 type VerifyViewState =
   | { status: 'entry'; hasValidationError?: boolean }
@@ -43,6 +46,14 @@ function isBadgeStatus(value: unknown): value is VerifyBadgeStatus {
 
 function isTrustGrade(value: unknown): value is VerifyTrustGrade {
   return value === 'A' || value === 'B' || value === 'C' || value === 'D';
+}
+
+function isAuthenticityStatus(value: unknown): value is VerifyAuthenticityStatus {
+  return value === 'not-checked' || value === 'ready' || value === 'failed';
+}
+
+function isAuthenticityMethod(value: unknown): value is VerifyAuthenticityMethod {
+  return value === 'document-code' || value === 'qr-url' || value === 'missing';
 }
 
 function safeDecode(value: string): string {
@@ -140,6 +151,24 @@ function createBadgeTuple(badges: VerifyBadge[]): VerifyReport['badges'] {
   return [badges[0], badges[1], badges[2], badges[3], badges[4], badges[5]];
 }
 
+function parseAuthenticityCheck(value: unknown): VerifyAuthenticityCheck | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const id = getString(value.id);
+  const label = getString(value.label);
+  const status = value.status;
+  const method = value.method;
+  const summary = getString(value.summary);
+
+  if (!id || !label || !isAuthenticityStatus(status) || !isAuthenticityMethod(method) || !summary) {
+    return undefined;
+  }
+
+  return { id, label, status, method, summary };
+}
+
 function parseReportPayload(payload: unknown): VerifyReport {
   if (!isRecord(payload) || !isRecord(payload.report)) {
     throw new Error(t('verifyInvalidResponse', locale));
@@ -159,13 +188,19 @@ function parseReportPayload(payload: unknown): VerifyReport {
   if (badges.some((badge) => badge === undefined)) {
     throw new Error(t('verifyInvalidResponse', locale));
   }
+  const rawAuthenticityChecks = Array.isArray(report.authenticityChecks) ? report.authenticityChecks : [];
+  const authenticityChecks = rawAuthenticityChecks.map(parseAuthenticityCheck);
+  if (authenticityChecks.some((check) => check === undefined)) {
+    throw new Error(t('verifyInvalidResponse', locale));
+  }
 
   return {
     reportId,
     holderId,
     trustGrade,
     generatedAt,
-    badges: createBadgeTuple(badges.filter((badge): badge is VerifyBadge => badge !== undefined))
+    badges: createBadgeTuple(badges.filter((badge): badge is VerifyBadge => badge !== undefined)),
+    authenticityChecks: authenticityChecks.filter((check): check is VerifyAuthenticityCheck => check !== undefined)
   };
 }
 

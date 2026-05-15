@@ -1202,7 +1202,8 @@ body {
 
 .tenant-wizard-document-result__title,
 .tenant-wizard-document-result__summary,
-.tenant-wizard-document-result__meta {
+.tenant-wizard-document-result__meta,
+.tenant-wizard-document-result__authenticity-summary {
   margin: 0;
 }
 
@@ -1213,12 +1214,20 @@ body {
 }
 
 .tenant-wizard-document-result__summary,
-.tenant-wizard-document-result__meta {
+.tenant-wizard-document-result__meta,
+.tenant-wizard-document-result__authenticity-summary {
   overflow-wrap: anywhere;
   color: var(--color-neutral-700);
   font-size: var(--font-size-caption);
   font-weight: 700;
   line-height: var(--line-height-copy);
+}
+
+.tenant-wizard-document-result__authenticity {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
 }
 
 .tenant-wizard-renewal-guide {
@@ -1750,7 +1759,8 @@ body {
 .verify-page .ui-card__body,
 .verify-result-summary > *,
 .verify-badge-grid > *,
-.verify-evidence-list > * {
+.verify-evidence-list > *,
+.verify-authenticity-list > * {
   min-width: 0;
 }
 
@@ -1758,7 +1768,9 @@ body {
 .verify-page .ui-card__description,
 .verify-badge-item__title,
 .verify-badge-item__summary,
-.verify-badge-item__evidence {
+.verify-badge-item__evidence,
+.verify-authenticity-item__title,
+.verify-authenticity-item__summary {
   overflow-wrap: break-word;
   word-break: keep-all;
 }
@@ -1767,7 +1779,8 @@ body {
 .verify-entry-card,
 .verify-loading-card,
 .verify-actions,
-.verify-evidence {
+.verify-evidence,
+.verify-authenticity {
   position: relative;
   overflow: hidden;
   border-color: var(--color-primary-100);
@@ -1883,12 +1896,14 @@ body {
 }
 
 .verify-badge-grid,
-.verify-evidence-list {
+.verify-evidence-list,
+.verify-authenticity-list {
   display: grid;
   gap: var(--space-3);
 }
 
-.verify-badge-item {
+.verify-badge-item,
+.verify-authenticity-item {
   display: grid;
   gap: var(--space-2);
   padding: var(--space-4);
@@ -1897,7 +1912,8 @@ body {
   background: var(--color-neutral-50-alpha-88);
 }
 
-.verify-badge-item__header {
+.verify-badge-item__header,
+.verify-authenticity-item__header {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
@@ -1907,18 +1923,22 @@ body {
 
 .verify-badge-item__title,
 .verify-badge-item__summary,
-.verify-badge-item__evidence {
+.verify-badge-item__evidence,
+.verify-authenticity-item__title,
+.verify-authenticity-item__summary {
   margin: 0;
 }
 
-.verify-badge-item__title {
+.verify-badge-item__title,
+.verify-authenticity-item__title {
   color: var(--color-neutral-900);
   font-size: var(--font-size-body);
   font-weight: 900;
   letter-spacing: var(--letter-spacing-body);
 }
 
-.verify-badge-item__summary {
+.verify-badge-item__summary,
+.verify-authenticity-item__summary {
   color: var(--color-neutral-800);
   font-size: var(--font-size-caption);
   font-weight: 800;
@@ -2870,7 +2890,8 @@ body {
   .verify-result-summary,
   .verify-actions__buttons,
   .verify-badge-grid,
-  .verify-evidence-list {
+  .verify-evidence-list,
+  .verify-authenticity-list {
     grid-template-columns: repeat(2, minmax(var(--size-verify-panel-min), 1fr));
   }
 

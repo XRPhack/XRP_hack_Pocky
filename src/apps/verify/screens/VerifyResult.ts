@@ -5,6 +5,7 @@ import { appendChildren, createTextElement, cx, type UiChild } from '../../../sh
 
 type VerifyBadgeStatus = 'pass' | 'warning' | 'fail';
 type VerifyTrustGrade = 'A' | 'B' | 'C' | 'D';
+type VerifyAuthenticityStatus = 'not-checked' | 'ready' | 'failed';
 
 export type VerifyConfirmationStatus = 'idle' | 'submitting' | 'success' | 'error';
 
@@ -16,12 +17,21 @@ export type VerifyBadge = {
   evidence: string;
 };
 
+export type VerifyAuthenticityCheck = {
+  id: string;
+  label: string;
+  status: VerifyAuthenticityStatus;
+  method: 'document-code' | 'qr-url' | 'missing';
+  summary: string;
+};
+
 export type VerifyReport = {
   reportId: string;
   holderId: string;
   trustGrade: VerifyTrustGrade;
   generatedAt: string;
   badges: [VerifyBadge, VerifyBadge, VerifyBadge, VerifyBadge, VerifyBadge, VerifyBadge];
+  authenticityChecks: VerifyAuthenticityCheck[];
 };
 
 export type VerifyEvidenceLink = {
@@ -78,6 +88,24 @@ function badgeVariant(status: VerifyBadgeStatus): 'success' | 'warning' | 'error
   }
 
   return status === 'fail' ? 'error' : 'success';
+}
+
+function authenticityVariant(status: VerifyAuthenticityStatus): 'success' | 'warning' | 'error' {
+  if (status === 'ready') {
+    return 'success';
+  }
+
+  return status === 'failed' ? 'error' : 'warning';
+}
+
+function authenticityStatusLabel(status: VerifyAuthenticityStatus, locale: Locale): string {
+  if (status === 'ready') {
+    return t('verifyAuthenticityStatusReady', locale);
+  }
+
+  return status === 'failed'
+    ? t('verifyAuthenticityStatusFailed', locale)
+    : t('verifyAuthenticityStatusNotChecked', locale);
 }
 
 function maskIdentifier(value: string): string {
@@ -195,6 +223,48 @@ function createBadgesCard(report: VerifyReport, locale: Locale): HTMLElement {
     children: grid
   });
   card.classList.add('verify-badges');
+  return card;
+}
+
+function createAuthenticityCard(report: VerifyReport, locale: Locale): HTMLElement | null {
+  if (report.authenticityChecks.length === 0) {
+    return null;
+  }
+
+  const list = document.createElement('div');
+  list.className = 'verify-authenticity-list';
+
+  for (const check of report.authenticityChecks) {
+    const item = document.createElement('article');
+    item.className = 'verify-authenticity-item';
+
+    const header = document.createElement('div');
+    header.className = 'verify-authenticity-item__header';
+    appendChildren(
+      header,
+      createTextElement('h3', 'verify-authenticity-item__title', check.label),
+      Badge({
+        label: authenticityStatusLabel(check.status, locale),
+        variant: authenticityVariant(check.status)
+      })
+    );
+
+    appendChildren(
+      item,
+      header,
+      createMetaRow(t('verifyAuthenticityMethodLabel', locale), check.method),
+      createTextElement('p', 'verify-authenticity-item__summary', check.summary)
+    );
+    list.appendChild(item);
+  }
+
+  const card = Card({
+    eyebrow: t('verifyAuthenticityEyebrow', locale),
+    title: t('verifyAuthenticityTitle', locale).replace('{count}', String(report.authenticityChecks.length)),
+    description: t('verifyAuthenticityCopy', locale),
+    children: list
+  });
+  card.classList.add('verify-authenticity');
   return card;
 }
 
@@ -392,6 +462,7 @@ export function VerifyResultScreen({ locale, report, evidenceLinks, localeToggle
     content,
     summary,
     createResultActions(confirmationStatus, normalizedLocale, onConfirm, onPrint),
+    createAuthenticityCard(report, normalizedLocale),
     createBadgesCard(report, normalizedLocale),
     createEvidenceCard(evidenceLinks, normalizedLocale)
   );

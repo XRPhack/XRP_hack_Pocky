@@ -101,6 +101,7 @@ test('login to landlord confirmation happy path', async ({ browser }) => {
 
     await page.getByRole('button', { name: 'Verify documents' }).click();
     await expect(page.locator('.tenant-wizard-card').filter({ hasText: 'Verify documents' }).getByText('Success')).toBeVisible();
+    await expect(page.getByText('Authenticity check ready')).toHaveCount(2);
     await expect(page.getByRole('heading', { name: 'Issue credentials' })).toBeVisible();
     await saveEvidence(page, '06-wizard-documents.png');
 
@@ -148,6 +149,8 @@ test('login to landlord confirmation happy path', async ({ browser }) => {
       await expect(landlordPage.getByRole('heading', { name: 'Automatically verify the public trust report', level: 1 })).toBeVisible();
       await expect(landlordPage.getByText(verifyPath.replace('/verify/', ''))).toBeVisible();
       await expect(landlordPage.getByText(`Trust Grade ${dashboardGrade}`)).toBeVisible();
+      await expect(landlordPage.getByRole('heading', { name: '2 authenticity checks' })).toBeVisible();
+      await expect(landlordPage.locator('.verify-authenticity-item')).toHaveCount(2);
       await expect(landlordPage.locator('.verify-badge-item')).toHaveCount(6);
       await expect(landlordPage.getByRole('link', { name: /DIDSet/ })).toBeVisible();
       await expect(landlordPage.evaluate(() => localStorage.getItem('nomokdon.session'))).resolves.toBeNull();
