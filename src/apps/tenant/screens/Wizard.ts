@@ -16,12 +16,17 @@ type WizardStepState = {
 type WizardScreenProps = {
   locale: Locale;
   activeStepIndex: number;
-  steps: [WizardStepState, WizardStepState, WizardStepState];
+  steps: [WizardStepState, WizardStepState, WizardStepState, WizardStepState];
   reportBadges: string[];
   selectedFixtureId: TenantWizardFixtureId;
   isFixtureLocked: boolean;
+  selectedDocumentNames: {
+    visa?: string;
+    employment?: string;
+  };
   localeToggle: UiChild;
   onFixtureChange: (fixtureId: TenantWizardFixtureId) => void;
+  onDocumentChange: (kind: 'visa' | 'employment', file: File | null) => void;
   onRunStep: (stepIndex: number) => void;
 };
 
@@ -62,6 +67,12 @@ const wizardSteps = [
     copy: 'tenantWizardStepDidCopy',
     action: 'tenantWizardStepDidAction',
     types: ['DIDSet']
+  },
+  {
+    title: 'tenantWizardStepDocumentTitle',
+    copy: 'tenantWizardStepDocumentCopy',
+    action: 'tenantWizardStepDocumentAction',
+    labels: []
   },
   {
     title: 'tenantWizardStepCredentialTitle',
@@ -152,6 +163,53 @@ function createStepAction(stepIndex: number, status: WizardStepStatus, isActive:
   return action;
 }
 
+function createDocumentUploadControls(
+  stepIndex: number,
+  status: WizardStepStatus,
+  isActive: boolean,
+  locale: Locale,
+  selectedDocumentNames: WizardScreenProps['selectedDocumentNames'],
+  onDocumentChange: WizardScreenProps['onDocumentChange']
+): HTMLElement | null {
+  if (stepIndex !== 1 || !isActive || status === 'loading' || status === 'success') {
+    return null;
+  }
+
+  const group = document.createElement('div');
+  group.className = 'tenant-wizard-document-upload';
+
+  for (const kind of ['visa', 'employment'] as const) {
+    const label = document.createElement('label');
+    label.className = 'tenant-wizard-document-upload__field';
+
+    const input = document.createElement('input');
+    input.className = 'tenant-wizard-document-upload__input';
+    input.type = 'file';
+    input.accept = '.json,.txt,application/json,text/plain';
+    input.addEventListener('change', () => {
+      onDocumentChange(kind, input.files?.[0] ?? null);
+    });
+
+    appendChildren(
+      label,
+      createTextElement(
+        'span',
+        'tenant-wizard-document-upload__label',
+        t(kind === 'visa' ? 'tenantWizardDocumentVisaLabel' : 'tenantWizardDocumentEmploymentLabel', locale)
+      ),
+      input,
+      createTextElement(
+        'span',
+        'tenant-wizard-document-upload__filename',
+        selectedDocumentNames[kind] ?? t('tenantWizardDocumentFixtureFallback', locale)
+      )
+    );
+    group.appendChild(label);
+  }
+
+  return group;
+}
+
 function createFixtureSelector(
   locale: Locale,
   selectedFixtureId: TenantWizardFixtureId,
@@ -201,7 +259,7 @@ function createFixtureSelector(
 }
 
 function createCredentialFallbackGuide(stepIndex: number, step: WizardStepState, locale: Locale): HTMLElement | null {
-  if (stepIndex !== 1 || step.status !== 'error') {
+  if ((stepIndex !== 1 && stepIndex !== 2) || step.status !== 'error') {
     return null;
   }
 
@@ -225,7 +283,15 @@ function createCredentialFallbackGuide(stepIndex: number, step: WizardStepState,
   return guide;
 }
 
-function createStepCard(stepIndex: number, step: WizardStepState, activeStepIndex: number, locale: Locale, onRunStep: (stepIndex: number) => void): HTMLElement {
+function createStepCard(
+  stepIndex: number,
+  step: WizardStepState,
+  activeStepIndex: number,
+  locale: Locale,
+  selectedDocumentNames: WizardScreenProps['selectedDocumentNames'],
+  onDocumentChange: WizardScreenProps['onDocumentChange'],
+  onRunStep: (stepIndex: number) => void
+): HTMLElement {
   const isActive = stepIndex === activeStepIndex;
   const card = Card({
     eyebrow: `${t('tenantWizardStepLabel', locale)} ${stepIndex + 1}`,
@@ -243,6 +309,7 @@ function createStepCard(stepIndex: number, step: WizardStepState, activeStepInde
           })
         : null,
       createCredentialFallbackGuide(stepIndex, step, locale),
+      createDocumentUploadControls(stepIndex, step.status, isActive, locale, selectedDocumentNames, onDocumentChange),
       createStepAction(stepIndex, step.status, isActive, locale, onRunStep)
     ],
     elevated: isActive
@@ -277,9 +344,23 @@ function createFinalBadges(reportBadges: string[], locale: Locale): HTMLElement 
   return group;
 }
 
-export function WizardScreen({ locale, activeStepIndex, steps, reportBadges, selectedFixtureId, isFixtureLocked, localeToggle, onFixtureChange, onRunStep }: WizardScreenProps): HTMLElement {
+export function WizardScreen({
+  locale,
+  activeStepIndex,
+  steps,
+  reportBadges,
+  selectedFixtureId,
+  isFixtureLocked,
+  selectedDocumentNames,
+  localeToggle,
+  onFixtureChange,
+  onDocumentChange,
+  onRunStep
+}: WizardScreenProps): HTMLElement {
   const normalizedLocale = normalizeLocale(locale);
-  const stepCards = steps.map((step, index) => createStepCard(index, step, activeStepIndex, normalizedLocale, onRunStep));
+  const stepCards = steps.map((step, index) =>
+    createStepCard(index, step, activeStepIndex, normalizedLocale, selectedDocumentNames, onDocumentChange, onRunStep)
+  );
   const finalBadges = createFinalBadges(reportBadges, normalizedLocale);
 
   const content = document.createElement('div');

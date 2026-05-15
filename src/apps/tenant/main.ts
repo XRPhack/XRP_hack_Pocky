@@ -1,4 +1,5 @@
 import '../../styles.css';
+import { employmentEdgeCase, employmentHappyCase } from '../../domain/adapters/employment.fixture';
 import { visaEdgeCase, visaHappyCase, visaMockAdapter } from '../../domain/adapters/visa.fixture';
 import { getLocalePreference, getSession, setLocalePreference, setSession, type TossOAuthMockSessionInput } from '../../shared/auth/session';
 import { t, type Locale } from '../../shared/i18n';
@@ -38,7 +39,11 @@ type TenantState = {
   trustPassPlaceholderVisible: boolean;
   selectedFixtureId: TenantWizardFixtureId;
   wizardStepIndex: number;
-  wizardSteps: [WizardStepState, WizardStepState, WizardStepState];
+  wizardSteps: [WizardStepState, WizardStepState, WizardStepState, WizardStepState];
+  documentFiles: {
+    visa?: File;
+    employment?: File;
+  };
   reportBadges: string[];
   dashboardBadges?: [DashboardBadge, DashboardBadge, DashboardBadge, DashboardBadge, DashboardBadge, DashboardBadge];
   reportId?: string;
@@ -65,6 +70,7 @@ const state: TenantState = {
   selectedFixtureId: 'happy',
   wizardStepIndex: 0,
   wizardSteps: createWizardStepStates(),
+  documentFiles: {},
   reportBadges: []
 };
 
@@ -78,8 +84,9 @@ class WizardStepError extends Error {
   }
 }
 
-function createWizardStepStates(): [WizardStepState, WizardStepState, WizardStepState] {
+function createWizardStepStates(): [WizardStepState, WizardStepState, WizardStepState, WizardStepState] {
   return [
+    { status: 'idle', progress: 0 },
     { status: 'idle', progress: 0 },
     { status: 'idle', progress: 0 },
     { status: 'idle', progress: 0 }
@@ -174,6 +181,7 @@ function showOnboarding(): void {
   state.trustPassPlaceholderVisible = false;
   state.wizardStepIndex = 0;
   state.wizardSteps = createWizardStepStates();
+  state.documentFiles = {};
   clearDashboardReport();
   render();
 }
@@ -183,6 +191,7 @@ function showWizard(): void {
   state.trustPassPlaceholderVisible = false;
   state.wizardStepIndex = 0;
   state.wizardSteps = createWizardStepStates();
+  state.documentFiles = {};
   clearDashboardReport();
   render();
 }
@@ -198,6 +207,22 @@ function selectWizardFixture(fixtureId: TenantWizardFixtureId): void {
 
   state.selectedFixtureId = fixtureId;
   clearDashboardReport();
+  render();
+}
+
+function setDocumentFile(kind: 'visa' | 'employment', file: File | null): void {
+  if (state.wizardStepIndex !== 1 || state.wizardSteps[1].status === 'loading') {
+    return;
+  }
+
+  if (file) {
+    state.documentFiles = { ...state.documentFiles, [kind]: file };
+  } else {
+    const nextFiles = { ...state.documentFiles };
+    delete nextFiles[kind];
+    state.documentFiles = nextFiles;
+  }
+
   render();
 }
 
@@ -231,6 +256,101 @@ async function validateCredentialFixture(): Promise<void> {
       .replace('{expiresAt}', formatFixtureDate(visaInput.expiresAt))
       .replace('{reason}', visaResult.message ?? visaResult.data.summary)
   );
+}
+
+function encodeTextAsBase64(value: string): string {
+  const bytes = new TextEncoder().encode(value);
+  let binary = '';
+
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+
+  return btoa(binary);
+}
+
+async function fileToBase64(file: File): Promise<string> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = '';
+
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+
+  return btoa(binary);
+}
+
+function createFixtureDocument(kind: 'visa' | 'employment'): { filename: string; mimeType: 'application/json'; base64: string } {
+  const visaInput = state.selectedFixtureId === 'edge' ? visaEdgeCase : visaHappyCase;
+  const employmentInput = state.selectedFixtureId === 'edge' ? employmentEdgeCase : employmentHappyCase;
+  const payload = kind === 'visa'
+    ? {
+        documentType: 'foreign-registration-certificate',
+        subjectId: visaInput.subjectId,
+        visaType: visaInput.visaType,
+        nationality: visaInput.nationality,
+        expiresAt: visaInput.expiresAt,
+        issuer: visaInput.issuer,
+        foreignRegistrationNumberLast4: visaInput.passportNumberLast4
+      }
+    : {
+        documentType: 'employment-confirmation',
+        subjectId: employmentInput.subjectId,
+        verificationChannel: employmentInput.verificationChannel === 'school' ? 'school' : 'employment-insurance',
+        organizationName: employmentInput.organizationName,
+        roleOrProgram: employmentInput.roleOrProgram,
+        acquiredAt: employmentInput.enrollmentVerified || employmentInput.employmentVerified ? '2025-03-01T00:00:00.000Z' : undefined,
+        lostAt: employmentInput.enrollmentVerified || employmentInput.employmentVerified ? undefined : '2025-12-31T00:00:00.000Z',
+        issuer: `${employmentInput.verificationChannel}-mock-registry`
+      };
+
+  return {
+    filename: `${kind}-${state.selectedFixtureId}.json`,
+    mimeType: 'application/json',
+    base64: encodeTextAsBase64(JSON.stringify(payload))
+  };
+}
+
+async function createUploadedDocumentPayload(kind: 'visa' | 'employment'): Promise<{ filename: string; mimeType: string; base64: string }> {
+  const file = state.documentFiles[kind];
+
+  if (!file) {
+    return createFixtureDocument(kind);
+  }
+
+  return {
+    filename: file.name,
+    mimeType: file.type || 'text/plain',
+    base64: await fileToBase64(file)
+  };
+}
+
+async function uploadVerificationDocuments(): Promise<void> {
+  const session = getSession();
+  const response = await fetch('/api/verification-documents', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      subjectId: session?.userId,
+      visaDocument: await createUploadedDocumentPayload('visa'),
+      employmentDocument: await createUploadedDocumentPayload('employment')
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(t('tenantWizardDocumentErrorCopy', state.locale));
+  }
+
+  const payload = await response.json() as unknown;
+
+  if (!isRecord(payload) || payload.status !== 'verified') {
+    throw new WizardStepError(
+      t('tenantWizardDocumentReviewTitle', state.locale),
+      t('tenantWizardDocumentReviewCopy', state.locale)
+    );
+  }
 }
 
 function parseDryRunReport(payload: unknown): {
@@ -374,7 +494,7 @@ async function runWizardStep(stepIndex: number): Promise<void> {
     step.progress = 72;
     render();
 
-    if (stepIndex === 2) {
+    if (stepIndex === 3) {
       const report = await fetchDryRunReport();
       state.reportId = report.reportId;
       state.trustGrade = report.trustGrade;
@@ -382,6 +502,9 @@ async function runWizardStep(stepIndex: number): Promise<void> {
       state.reportBadges = report.badges.map((badge) => badge.label);
       state.shareFeedbackKey = undefined;
     } else if (stepIndex === 1) {
+      await validateCredentialFixture();
+      await uploadVerificationDocuments();
+    } else if (stepIndex === 2) {
       await validateCredentialFixture();
     } else {
       await delay(240);
@@ -392,7 +515,7 @@ async function runWizardStep(stepIndex: number): Promise<void> {
     step.errorTitle = undefined;
     step.errorMessage = undefined;
     state.wizardStepIndex = Math.min(stepIndex + 1, state.wizardSteps.length - 1);
-    if (stepIndex === 2 && state.wizardSteps.every((wizardStep) => wizardStep.status === 'success')) {
+    if (stepIndex === 3 && state.wizardSteps.every((wizardStep) => wizardStep.status === 'success')) {
       state.stage = 'dashboard';
     }
     render();
@@ -548,8 +671,13 @@ function render(): void {
         reportBadges: state.reportBadges,
         selectedFixtureId: state.selectedFixtureId,
         isFixtureLocked: isFixtureLocked(),
+        selectedDocumentNames: {
+          visa: state.documentFiles.visa?.name,
+          employment: state.documentFiles.employment?.name
+        },
         localeToggle: createHeaderActions(),
         onFixtureChange: selectWizardFixture,
+        onDocumentChange: setDocumentFile,
         onRunStep: (stepIndex) => {
           void runWizardStep(stepIndex);
         }
