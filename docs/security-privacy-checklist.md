@@ -1,55 +1,55 @@
-# Security and Privacy Checklist
+# 보안 및 개인정보 체크리스트
 
-This checklist captures the current MVP privacy boundary for document upload, DID, VC, report, and audit-log flows.
+이 체크리스트는 문서 업로드, DID, VC, report, audit-log 흐름에서 현재 MVP가 지켜야 할 개인정보 경계를 정리합니다.
 
-## Sensitive Values That Must Not Be Returned
+## 반환하면 안 되는 민감 값
 
-The API and UI must not expose:
+API와 UI는 다음 값을 노출하면 안 됩니다.
 
-- raw uploaded document bodies
-- full foreign registration numbers
-- raw document verification codes
-- raw QR verification URLs
-- organization names from employment/school evidence
-- role or program names from employment/school evidence
-- phone numbers, emails, IP addresses, and device fingerprints in logs
-- issuer seeds, private keys, request secrets, and transaction blobs
+- 업로드된 원본 document body
+- 전체 외국인등록번호
+- 원본 document verification code
+- 원본 QR verification URL
+- employment/school evidence에 포함된 organization name
+- employment/school evidence에 포함된 role 또는 program name
+- log 안의 phone number, email, IP address, device fingerprint
+- issuer seed, private key, request secret, transaction blob
 
-## Allowed Derived Values
+## 반환 가능한 파생 값
 
-The following values are safe to return:
+다음 값은 반환해도 안전합니다.
 
-- document evidence hashes
-- field hashes, such as `foreignRegistrationNumberHash`, `organizationNameHash`, `roleOrProgramHash`
-- last 4 digits of a foreign registration number when provided or extracted
+- document evidence hash
+- `foreignRegistrationNumberHash`, `organizationNameHash`, `roleOrProgramHash` 같은 field hash
+- 제공되었거나 추출된 foreign registration number의 마지막 4자리
 - authenticity status/method/summary
-- manual review ticket id, queue, reason code, and document hash
-- report id, DID service references, VC ids, and public XRPL Testnet hashes
+- manual review ticket id, queue, reason code, document hash
+- report id, DID service reference, VC id, public XRPL Testnet hash
 
-## Current Guardrails
+## 현재 Guardrail
 
-- `sendJson` sanitizes known secret-like keys before writing API responses.
-- Document adapters hash or omit raw sensitive document fields.
-- Manual review tickets contain only hashes and metadata, not source document content.
-- `/api/logs` renders document verification status and reason codes, not raw document fields.
-- Uploaded verification results expire after the configured TTL and are removed before signing if stale.
-- Re-uploading replaces previous verification results for the same session.
+- `sendJson`은 API response를 작성하기 전에 secret처럼 보이는 알려진 key를 sanitize합니다.
+- Document adapter는 원본 민감 document field를 hash 처리하거나 생략합니다.
+- Manual review ticket에는 source document content가 아니라 hash와 metadata만 포함됩니다.
+- `/api/logs`는 원본 document field가 아니라 document verification status와 reason code를 렌더링합니다.
+- 업로드된 verification result는 설정된 TTL 이후 만료되며, 오래된 경우 signing 전에 제거됩니다.
+- 같은 session에 다시 업로드하면 이전 verification result를 대체합니다.
 
-## Test Coverage
+## 테스트 범위
 
-The current automated checks cover:
+현재 자동화 테스트는 다음 항목을 확인합니다.
 
-- document adapter output omits raw foreign registration numbers, verification codes, QR URLs, organization names, and role/program names
-- upload responses omit raw document values
-- sign-and-submit, DID, VC, employment VC, and report responses omit uploaded raw values
-- document verification logs omit raw document values across success, manual-review, re-upload, and expiry paths
-- issuer credentials, seeds, private keys, request secrets, and transaction blobs are not leaked
-- landlord confirmation logs omit landlord PII and device data
-- encrypted report storage does not expose plaintext report payloads when `VC_ENCRYPTION_KEY` is configured
+- document adapter output이 원본 foreign registration number, verification code, QR URL, organization name, role/program name을 생략하는지
+- upload response가 원본 document value를 생략하는지
+- sign-and-submit, DID, VC, employment VC, report response가 업로드된 원본 값을 생략하는지
+- document verification log가 success, manual-review, re-upload, expiry 경로 전반에서 원본 document value를 생략하는지
+- issuer credential, seed, private key, request secret, transaction blob이 유출되지 않는지
+- landlord confirmation log가 landlord PII와 device data를 생략하는지
+- `VC_ENCRYPTION_KEY`가 설정된 경우 encrypted report storage가 plaintext report payload를 노출하지 않는지
 
-## Remaining Production Work
+## 운영 전 남은 작업
 
-- Replace the local in-memory stores with scoped persistent storage that has encrypted fields and retention controls.
-- Add authentication/authorization around issuer and audit-log APIs before any remote deployment.
-- Ensure any real OCR provider or manual-review queue stores uploaded originals outside public API responses and returns only ticket metadata.
-- Add operational deletion/export workflows for user data requests.
+- 로컬 in-memory store를 encrypted field와 retention control이 있는 범위 제한 persistent storage로 교체합니다.
+- 원격 배포 전 issuer API와 audit-log API에 authentication/authorization을 추가합니다.
+- 실제 OCR provider 또는 manual-review queue가 public API response 밖에 업로드 원본을 저장하고 ticket metadata만 반환하도록 보장합니다.
+- user data request를 위한 운영용 deletion/export workflow를 추가합니다.
