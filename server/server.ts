@@ -229,8 +229,6 @@ const verifiableCredentialsById = new Map<string, StoredVerifiableCredential>();
 const documentVerificationsBySessionId = new Map<string, DocumentVerificationRecord>();
 const logEvents: LogEvent[] = [];
 
-let activeSessionId: string | null = null;
-
 const simulatorDemoFixtures = demoFixtures as DemoFixtureData;
 const SIMULATOR_EVIDENCE_SOURCE = 'fixture-backed Testnet evidence';
 const SIMULATOR_ESCROW_AMOUNT_XRP = 10;
@@ -509,7 +507,7 @@ function getSessionIdFromRequest(request: IncomingMessage, url: URL, body?: Json
 }
 
 function getCurrentSession(request: IncomingMessage, url: URL, body?: JsonObject): { sessionId?: string; session: ApiSession | null } {
-  const sessionId = getSessionIdFromRequest(request, url, body) ?? activeSessionId ?? undefined;
+  const sessionId = getSessionIdFromRequest(request, url, body);
 
   if (!sessionId) {
     return { session: null };
@@ -1029,7 +1027,6 @@ async function handleTossMockAuth(request: IncomingMessage, response: ServerResp
   };
 
   sessionsById.set(sessionId, session);
-  activeSessionId = sessionId;
 
   const logEvent = appendLog({
     type: 'auth.toss-mock',
@@ -1203,6 +1200,11 @@ async function handleSignAndSubmit(request: IncomingMessage, response: ServerRes
   const body = await readJsonBody(request);
   const { sessionId, session } = getCurrentSession(request, url, body);
   const tenantAddress = session?.tenantWalletAddress ?? normalizeString(body.tenantWalletAddress);
+
+  if (!sessionId || !session) {
+    sendError(response, 401, 'SESSION_REQUIRED', 'Create a session and provide its session id before signing.');
+    return;
+  }
 
   if (!tenantAddress) {
     sendError(response, 400, 'TENANT_WALLET_REQUIRED', 'Create a session first or provide tenantWalletAddress.');
@@ -1764,7 +1766,6 @@ export function resetApiState(): void {
   verifiableCredentialsById.clear();
   documentVerificationsBySessionId.clear();
   logEvents.splice(0, logEvents.length);
-  activeSessionId = null;
 }
 
 export function dumpReportStoreForTest(): string {

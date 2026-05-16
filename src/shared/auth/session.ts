@@ -4,6 +4,7 @@ export const LOCALE_STORAGE_KEY = 'nomokdon.locale';
 export type SessionLocale = 'en' | 'ko';
 
 export interface Session {
+  sessionId: string;
   userId: string;
   name: string;
   phone: string;
@@ -12,6 +13,7 @@ export interface Session {
 }
 
 export interface TossOAuthMockSessionInput {
+  sessionId?: string;
   userId: string;
   name: string;
   phone: string;
@@ -108,8 +110,9 @@ export function normalizeLocale(locale: unknown): SessionLocale {
   return DEFAULT_LOCALE;
 }
 
-function sanitizeSession(session: TossOAuthMockSessionInput): Session {
+function sanitizeSession(session: TossOAuthMockSessionInput, sessionId: string): Session {
   const sanitized: Session = {
+    sessionId,
     userId: session.userId,
     name: session.name,
     phone: session.phone,
@@ -144,8 +147,10 @@ function getActiveSessionId(): string | null {
 }
 
 export function setSession(session: TossOAuthMockSessionInput): Session {
-  const sanitized = sanitizeSession(session);
-  const sessionId = createSessionId();
+  const sessionId = typeof session.sessionId === 'string' && session.sessionId.startsWith(SESSION_ID_PREFIX)
+    ? session.sessionId
+    : createSessionId();
+  const sanitized = sanitizeSession(session, sessionId);
 
   sessionById.set(sessionId, sanitized);
   activeSessionId = sessionId;
@@ -173,6 +178,10 @@ export function getSession(): Session | null {
   }
 
   return sessionById.get(sessionId) ?? null;
+}
+
+export function getSessionId(): string | null {
+  return getActiveSessionId();
 }
 
 export function clearSession(): void {

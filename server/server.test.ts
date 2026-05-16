@@ -286,6 +286,36 @@ describe('mini Node API', () => {
     expect(sessionResponse.json.session).toEqual(json.session);
   });
 
+  it('does not reuse the latest session when a later request omits session id', async () => {
+    const tenantWalletAddress = Wallet.generate().classicAddress;
+    await postJson('/api/auth/toss-mock', {
+      userId: 'user-session-isolation',
+      name: 'Isolated Tenant',
+      phone: '+82-10-1212-3434',
+      tenantWalletAddress
+    });
+
+    const sessionResponse = await apiFetch('/api/session');
+    const sign = await postJson('/api/sign-and-submit', {
+      tenantWalletAddress,
+      dryRun: true
+    });
+
+    expect(sessionResponse.response.status).toBe(200);
+    expect(sessionResponse.json).toMatchObject({
+      ok: true,
+      sessionId: null,
+      session: null
+    });
+    expect(sign.response.status).toBe(401);
+    expect(sign.json).toMatchObject({
+      ok: false,
+      error: {
+        code: 'SESSION_REQUIRED'
+      }
+    });
+  });
+
   it('returns issuance and auth log events from memory', async () => {
     await postJson('/api/auth/toss-mock', {
       userId: 'user-log',
@@ -981,11 +1011,22 @@ describe('mini Node API', () => {
 
     process.env.VC_ENCRYPTION_KEY = invalidKey;
 
-    const sign = await postJson('/api/sign-and-submit', {
-      tenantWalletAddress: Wallet.generate().classicAddress,
-      dryRun: true,
-      reportId: 'report_invalid_encryption_key'
+    const auth = await postJson('/api/auth/toss-mock', {
+      userId: 'user-invalid-encryption',
+      name: 'Invalid Encryption Tenant',
+      phone: '+82-10-9999-1111',
+      tenantWalletAddress: Wallet.generate().classicAddress
     });
+    const sessionId = String(auth.json.sessionId);
+    const sign = await postJson(
+      '/api/sign-and-submit',
+      {
+        sessionId,
+        dryRun: true,
+        reportId: 'report_invalid_encryption_key'
+      },
+      { 'x-session-id': sessionId }
+    );
 
     expect(sign.response.status).toBe(500);
     expect(sign.json).toMatchObject({

@@ -43,6 +43,7 @@ describe('auth session store', () => {
 
   it('sets, gets, and clears a sanitized session', () => {
     const session = setSession({
+      sessionId: 'sess_server-issued',
       userId: 'user-1',
       name: 'Jin',
       phone: '+82-10-1234-5678',
@@ -54,6 +55,7 @@ describe('auth session store', () => {
     } as never);
 
     expect(session).toEqual({
+      sessionId: 'sess_server-issued',
       userId: 'user-1',
       name: 'Jin',
       phone: '+82-10-1234-5678',
@@ -64,7 +66,7 @@ describe('auth session store', () => {
     const stored = localStorageMock.getItem(SESSION_STORAGE_KEY);
 
     expect(stored).toBeTypeOf('string');
-    expect(stored).toMatch(/^sess_/);
+    expect(stored).toBe('sess_server-issued');
     expect(stored).not.toContain('Jin');
     expect(stored).not.toContain('+82-10-1234-5678');
     expect(stored).not.toContain('rTenantWallet');
@@ -84,6 +86,7 @@ describe('auth session store', () => {
   it('defaults locale to en when omitted or invalid', () => {
     expect(
       setSession({
+        sessionId: 'sess_user_2',
         userId: 'user-2',
         name: 'Mina',
         phone: '+82-10-0000-0000'
@@ -92,6 +95,7 @@ describe('auth session store', () => {
 
     expect(
       setSession({
+        sessionId: 'sess_user_3',
         userId: 'user-3',
         name: 'Alex',
         phone: '+82-10-9999-9999',
@@ -103,6 +107,7 @@ describe('auth session store', () => {
   it('accepts supported locale variants', () => {
     expect(
       setSession({
+        sessionId: 'sess_user_4',
         userId: 'user-4',
         name: 'Soo',
         phone: '+82-10-1111-2222',
@@ -112,6 +117,7 @@ describe('auth session store', () => {
 
     expect(
       setSession({
+        sessionId: 'sess_user_5',
         userId: 'user-5',
         name: 'Hana',
         phone: '+82-10-3333-4444',
@@ -122,6 +128,7 @@ describe('auth session store', () => {
 
   it('stores only a session id in browser storage', () => {
     setSession({
+      sessionId: 'sess_storage_only',
       userId: 'user-6',
       name: 'Rin',
       phone: '+82-10-5555-6666',
@@ -134,7 +141,7 @@ describe('auth session store', () => {
 
     const stored = localStorageMock.getItem(SESSION_STORAGE_KEY);
 
-    expect(stored).toMatch(/^sess_/);
+    expect(stored).toBe('sess_storage_only');
     expect(stored).not.toContain('Rin');
     expect(stored).not.toContain('5555');
     expect(stored).not.toContain('rTenantWallet');

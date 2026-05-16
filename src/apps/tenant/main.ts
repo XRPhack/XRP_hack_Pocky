@@ -1,7 +1,7 @@
 import '../../styles.css';
 import { employmentEdgeCase, employmentHappyCase } from '../../domain/adapters/employment.fixture';
 import { visaEdgeCase, visaHappyCase, visaMockAdapter } from '../../domain/adapters/visa.fixture';
-import { getLocalePreference, getSession, setLocalePreference, setSession, type TossOAuthMockSessionInput } from '../../shared/auth/session';
+import { getLocalePreference, getSession, getSessionId, setLocalePreference, setSession, type TossOAuthMockSessionInput } from '../../shared/auth/session';
 import { t, type Locale } from '../../shared/i18n';
 import { HistoryControls } from '../../shared/ui';
 import { getAppRoot } from '../app-placeholder';
@@ -127,15 +127,17 @@ function parseMockSession(payload: unknown): TossOAuthMockSessionInput {
     throw new Error('Invalid mock auth response.');
   }
 
+  const sessionId = getString(payload.sessionId);
   const userId = getString(payload.session.userId);
   const name = getString(payload.session.name);
   const phone = getString(payload.session.phone);
 
-  if (!userId || !name || !phone) {
+  if (!sessionId || !userId || !name || !phone) {
     throw new Error('Mock auth response is missing a sanitized session.');
   }
 
   return {
+    sessionId,
     userId,
     name,
     phone,
@@ -465,6 +467,7 @@ async function createUploadedDocumentPayload(kind: 'visa' | 'employment'): Promi
 
 async function uploadVerificationDocuments(): Promise<void> {
   const session = getSession();
+  const sessionId = getSessionId();
   const blockingFeedback = Object.values(state.documentFileFeedback).find((feedback) => feedback.variant === 'error');
 
   if (blockingFeedback) {
@@ -474,9 +477,11 @@ async function uploadVerificationDocuments(): Promise<void> {
   const response = await fetch('/api/verification-documents', {
     method: 'POST',
     headers: {
+      ...(sessionId ? { 'x-session-id': sessionId } : {}),
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
+      sessionId,
       subjectId: session?.userId,
       visaDocument: await createUploadedDocumentPayload('visa'),
       employmentDocument: await createUploadedDocumentPayload('employment')
@@ -645,12 +650,15 @@ function parseDryRunReport(payload: unknown): {
 
 async function fetchDryRunReport(): Promise<ReturnType<typeof parseDryRunReport>> {
   const session = getSession();
+  const sessionId = getSessionId();
   const response = await fetch('/api/sign-and-submit', {
     method: 'POST',
     headers: {
+      ...(sessionId ? { 'x-session-id': sessionId } : {}),
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
+      sessionId,
       dryRun: true,
       credentialType: 'nomokdon-visa',
       nationality: 'Philippines',
