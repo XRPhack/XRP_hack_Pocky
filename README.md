@@ -29,7 +29,7 @@ npm run dev
 
 ## 안전 경계
 
-- XRPL 로직은 `src/domain/*`와 `server/server.ts`에서 Testnet fixture/live evidence를 생성하거나 검증합니다.
+- XRPL 로직은 `front/src/domain/*`와 `server/server.ts`에서 Testnet fixture/live evidence를 생성하거나 검증합니다.
 - 앱은 seed/private key를 저장하지 않습니다. 실제 제출은 사용자 소유 지갑 또는 signer를 주입해 처리해야 합니다.
 - 현재 MVP는 외부 유료 API, 실제 Toss API, 실제 KRW 이동을 포함하지 않습니다.
 - 실제 계약 배포, 실명 인증, 실제 KRW 결제, 지갑 seed 저장은 이 MVP 범위 밖입니다.
@@ -39,24 +39,24 @@ npm run dev
 
 ```text
 XRP_hack_Pocky/
-├── index.html                     # Vite 앱 진입점
-├── tenant/                        # 임차인 모바일 앱 entry
-├── verify/                        # 임대인 공개 검증 entry
-├── issuer/                        # 발급자 콘솔 entry
 ├── package.json                   # 로컬 앱 scripts/dependencies
-├── server/                        # mini Node API
-├── scripts/                       # demo fixtures
-├── tsconfig.json
-├── vite.config.ts
-├── src/
-│   ├── main.ts                    # tenant app UI
-│   ├── styles.css                 # 로컬 MVP 스타일
-│   └── domain/
-│       ├── adapters/              # visa, employment, rent ledger fixtures
-│       ├── report.ts              # shareable report builder
-│       ├── trust.ts               # 설명 가능한 trust checklist 계산
-│       ├── types.ts
-│       └── xrpl*.ts               # DID, Credential, Payment, Escrow helpers
+├── front/                         # Vite 프론트엔드 앱
+│   ├── index.html                 # 루트 launcher entry
+│   ├── tenant/                    # 임차인 모바일 앱 entry
+│   ├── verify/                    # 임대인 공개 검증 entry
+│   ├── issuer/                    # 발급자 콘솔 entry
+│   ├── src/
+│   │   ├── main.ts                # launcher/placeholder 진입점
+│   │   ├── styles.css             # 로컬 MVP 스타일
+│   │   └── domain/
+│   │       ├── adapters/          # visa, employment, rent ledger fixtures
+│   │       ├── report.ts          # shareable report builder
+│   │       ├── trust.ts           # 설명 가능한 trust checklist 계산
+│   │       ├── types.ts
+│   │       └── xrpl*.ts           # DID, Credential, Payment, Escrow helpers
+│   └── vite.config.ts
+├── server/                        # API 서버 코드
+├── scripts/                       # demo fixtures/유틸
 └── docs/                          # current demo docs plus quarantined research
 ```
 

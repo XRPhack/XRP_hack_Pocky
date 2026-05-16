@@ -2,11 +2,11 @@ import { writeFile } from 'node:fs/promises'
 
 import type { TxResponse, Wallet } from 'xrpl'
 
-import { submitCreate, submitAccept } from '../src/domain/xrplCredential'
-import { submitDidSet } from '../src/domain/xrplDid'
-import { submitEscrowCreate } from '../src/domain/xrplEscrow'
-import { disconnectClient, fundTestWallet, XRPL_TESTNET_WS } from '../src/domain/xrplClient'
-import { submitRentPayment } from '../src/domain/xrplPayment'
+import { submitCreate, submitAccept } from '../front/src/domain/xrplCredential'
+import { submitDidSet } from '../front/src/domain/xrplDid'
+import { submitEscrowCreate } from '../front/src/domain/xrplEscrow'
+import { disconnectClient, fundTestWallet, XRPL_TESTNET_WS } from '../front/src/domain/xrplClient'
+import { submitRentPayment } from '../front/src/domain/xrplPayment'
 
 const TESTNET_EXPLORER_BASE_URL = 'https://testnet.xrpl.org/transactions'
 const OUTPUT_FILE = new URL('./demo-fixtures.json', import.meta.url)

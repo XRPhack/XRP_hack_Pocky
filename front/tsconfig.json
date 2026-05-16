@@ -15,7 +15,9 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
   },
-  "include": ["src", "server", "api", "playwright.config.ts", "tests/e2e"]
+  "include": ["src", "api", "playwright.config.ts", "tests/e2e"]
 }

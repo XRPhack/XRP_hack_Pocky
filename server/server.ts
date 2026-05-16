@@ -5,15 +5,15 @@ import { fileURLToPath } from 'node:url';
 import { Wallet } from 'xrpl';
 
 import demoFixtures from '../scripts/demo-fixtures.json' with { type: 'json' };
-import { employmentEdgeCase, employmentHappyCase } from '../src/domain/adapters/employment.fixture.js';
-import { rentLedgerEdgeCase, rentLedgerHappyCase } from '../src/domain/adapters/rent-ledger.fixture.js';
-import { visaEdgeCase, visaHappyCase } from '../src/domain/adapters/visa.fixture.js';
-import { buildReport, type BuiltReport, type ReportRentPayment } from '../src/domain/report.js';
-import { buildCredentialAccept, buildCredentialCreate, submitCreate } from '../src/domain/xrplCredential.js';
-import { buildDidSet } from '../src/domain/xrplDid.js';
-import { buildRentPayment } from '../src/domain/xrplPayment.js';
-import { createEscrowContractDraft } from '../src/domain/xrplService.js';
-import type { PropertyOffer, TenantProfile, VerificationStatus } from '../src/domain/types.js';
+import { employmentEdgeCase, employmentHappyCase } from '../front/src/domain/adapters/employment.fixture.js';
+import { rentLedgerEdgeCase, rentLedgerHappyCase } from '../front/src/domain/adapters/rent-ledger.fixture.js';
+import { visaEdgeCase, visaHappyCase } from '../front/src/domain/adapters/visa.fixture.js';
+import { buildReport, type BuiltReport, type ReportRentPayment } from '../front/src/domain/report.js';
+import { buildCredentialAccept, buildCredentialCreate, submitCreate } from '../front/src/domain/xrplCredential.js';
+import { buildDidSet } from '../front/src/domain/xrplDid.js';
+import { buildRentPayment } from '../front/src/domain/xrplPayment.js';
+import { createEscrowContractDraft } from '../front/src/domain/xrplService.js';
+import type { PropertyOffer, TenantProfile, VerificationStatus } from '../front/src/domain/types.js';
 
 type JsonObject = Record<string, unknown>;
 type SessionLocale = 'en' | 'ko';

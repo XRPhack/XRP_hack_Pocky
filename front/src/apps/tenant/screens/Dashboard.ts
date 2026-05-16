@@ -1,4 +1,4 @@
-import demoFixtures from '../../../../scripts/demo-fixtures.json';
+import demoFixtures from '../../../../../scripts/demo-fixtures.json';
 import qrcode from 'qrcode-generator';
 import { normalizeLocale, t, type Locale } from '../../../shared/i18n';
 import { Badge, Card, ExplorerLink, MobileShell, Toast } from '../../../shared/ui';

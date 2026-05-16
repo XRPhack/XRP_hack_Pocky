@@ -1,4 +1,4 @@
-import demoFixtures from '../../../../scripts/demo-fixtures.json';
+import demoFixtures from '../../../../../scripts/demo-fixtures.json';
 import { normalizeLocale, t, type Locale } from '../../../shared/i18n';
 import { Badge, Card, ErrorState, LoadingOverlay } from '../../../shared/ui';
 import { appendChildren, createTextElement, cx, type UiChild } from '../../../shared/ui/dom';

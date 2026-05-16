@@ -5,6 +5,7 @@ dist/
 .env
 .env.*
 !.env.example
+server/.env
 *.log
 .vercel
 .sisyphus/boulder.json
