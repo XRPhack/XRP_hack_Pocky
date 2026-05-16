@@ -13,7 +13,7 @@
 - 쿼리 파라미터 `sessionId`
 - `Authorization: Bearer <sessionId>`
 
-세션이 없으면 `subjectId`가 필요합니다. 이후 `POST /api/sign-and-submit`이 세션 ID로 검증 결과를 읽기 때문에, 세션 기반 업로드를 권장합니다.
+세션이 없으면 `subjectId`가 필요합니다. 이후 `POST /api/sign-and-submit`은 명시된 세션 ID로 검증 결과를 읽기 때문에, 세션 기반 업로드를 권장합니다. 서버는 최신 세션을 자동으로 재사용하지 않습니다.
 
 ## 지원 파일
 
@@ -365,9 +365,49 @@ HTTP `201`
 }
 ```
 
+## 발급 상태 응답
+
+`POST /api/sign-and-submit`은 `x-session-id`, 요청 본문의 `sessionId`, 쿼리 파라미터 `sessionId`, 또는 `Authorization: Bearer <sessionId>` 중 하나로 세션을 명시해야 합니다. 세션이 없거나 유효하지 않으면 HTTP `401`과 `SESSION_REQUIRED`를 반환합니다.
+
+응답의 `issuance` 객체는 DID/VC/report 단계가 draft인지, Testnet에 제출됐는지, validated 상태인지 구분합니다.
+
+```json
+{
+  "issuance": {
+    "mode": "dry-run",
+    "ledger": "XRPL Testnet",
+    "didSet": {
+      "status": "drafted",
+      "transactionType": "DIDSet"
+    },
+    "credentials": [
+      {
+        "id": "vc_report_abc",
+        "type": "nomokdon-visa",
+        "createStatus": "drafted",
+        "acceptStatus": "drafted"
+      },
+      {
+        "id": "vc_report_abc_employment",
+        "type": "nomokdon-employment",
+        "createStatus": "drafted",
+        "acceptStatus": "drafted"
+      }
+    ],
+    "report": {
+      "id": "report_abc",
+      "status": "stored"
+    },
+    "caveat": "Dry-run mode returns transaction drafts and locally stored report/VC placeholders without submitting to XRPL."
+  }
+}
+```
+
+현재 MVP에서 `dry-run`은 transaction draft와 로컬 report/VC placeholder만 생성합니다. `live-testnet` 모드에서도 VISA `CredentialCreate`만 제출 대상이며, DIDSet, CredentialAccept, employment credential, rent payment, escrow는 draft로 남습니다.
+
 ## 후속 사용
 
-`POST /api/sign-and-submit`은 만료되지 않은 최신 세션 검증 결과를 읽습니다.
+`POST /api/sign-and-submit`은 명시된 세션에 연결된 만료되지 않은 최신 검증 결과를 읽습니다.
 
 업로드 문서 검증 결과가 있으면 다음 항목에 영향을 줍니다.
 
