@@ -448,6 +448,31 @@ describe('mini Node API', () => {
       employmentCredentialCreate: expect.objectContaining({ TransactionType: 'CredentialCreate' }),
       employmentCredentialAccept: expect.objectContaining({ TransactionType: 'CredentialAccept' })
     });
+    expect(sign.json.issuance).toMatchObject({
+      mode: 'dry-run',
+      ledger: 'XRPL Testnet',
+      didSet: {
+        status: 'drafted',
+        transactionType: 'DIDSet'
+      },
+      credentials: [
+        expect.objectContaining({
+          type: 'nomokdon-visa',
+          createStatus: 'drafted',
+          acceptStatus: 'drafted'
+        }),
+        expect.objectContaining({
+          type: 'nomokdon-employment',
+          createStatus: 'drafted',
+          acceptStatus: 'drafted'
+        })
+      ],
+      report: {
+        id: sign.json.reportId,
+        status: 'stored'
+      }
+    });
+    expect(String((sign.json.issuance as { caveat?: unknown }).caveat)).toContain('Dry-run mode');
     expect(JSON.stringify(sign.json.drafts)).toContain('6E6F6D6F6B646F6E2D656D706C6F796D656E74');
     expect(sign.text).not.toContain('tx_blob');
     expectNoSecrets(sign.text, [issuerSeed, leakedRequestSeed, leakedRequestSecret, leakedPrivateKey, leakedTxBlob]);

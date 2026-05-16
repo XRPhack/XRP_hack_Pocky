@@ -129,6 +129,28 @@ type CredentialDescriptor = {
   uri: string;
 };
 
+type IssuanceStepStatus = 'drafted' | 'submitted' | 'validated';
+
+type IssuanceState = {
+  mode: string;
+  ledger: 'XRPL Testnet';
+  didSet: {
+    status: IssuanceStepStatus;
+    transactionType: 'DIDSet';
+  };
+  credentials: Array<{
+    id: string;
+    type: string;
+    createStatus: IssuanceStepStatus;
+    acceptStatus: IssuanceStepStatus;
+  }>;
+  report: {
+    id: string;
+    status: 'stored';
+  };
+  caveat: string;
+};
+
 type DocumentVerificationRecord = {
   sessionId: string;
   subjectId: string;
@@ -888,6 +910,58 @@ function createCredentialDescriptors(requestedCredentialId: string): {
   };
 }
 
+function resolveSubmittedStepStatus(submission: JsonObject): IssuanceStepStatus {
+  if (submission.status !== 'submitted') {
+    return 'drafted';
+  }
+
+  return submission.validated === true ? 'validated' : 'submitted';
+}
+
+function createIssuanceState({
+  mode,
+  submission,
+  credentials,
+  reportId
+}: {
+  mode: string;
+  submission: JsonObject;
+  credentials: { visa: CredentialDescriptor; employment: CredentialDescriptor };
+  reportId: string;
+}): IssuanceState {
+  const visaCreateStatus = resolveSubmittedStepStatus(submission);
+
+  return {
+    mode,
+    ledger: 'XRPL Testnet',
+    didSet: {
+      status: 'drafted',
+      transactionType: 'DIDSet'
+    },
+    credentials: [
+      {
+        id: credentials.visa.id,
+        type: credentials.visa.type,
+        createStatus: visaCreateStatus,
+        acceptStatus: 'drafted'
+      },
+      {
+        id: credentials.employment.id,
+        type: credentials.employment.type,
+        createStatus: 'drafted',
+        acceptStatus: 'drafted'
+      }
+    ],
+    report: {
+      id: reportId,
+      status: 'stored'
+    },
+    caveat: mode === 'live-testnet'
+      ? 'Only the visa CredentialCreate is submitted live in this MVP; DIDSet, CredentialAccept, employment credential, rent payment, and escrow remain drafts.'
+      : 'Dry-run mode returns transaction drafts and locally stored report/VC placeholders without submitting to XRPL.'
+  };
+}
+
 function createReportAuthenticityChecks(documentVerification?: DocumentVerificationRecord): ReportAuthenticityCheck[] {
   const checks: ReportAuthenticityCheck[] = [];
 
@@ -1428,6 +1502,12 @@ async function handleSignAndSubmit(request: IncomingMessage, response: ServerRes
     reportId: report.reportId,
     mode: submission.mode,
     ledger: 'XRPL Testnet',
+    issuance: createIssuanceState({
+      mode: String(submission.mode),
+      submission,
+      credentials,
+      reportId: report.reportId
+    }),
     issuerAddress: issuerConfig.issuerAddress,
     tenantWalletAddress: tenantAddress,
     drafts: {
