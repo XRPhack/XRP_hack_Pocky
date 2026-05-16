@@ -16,11 +16,11 @@ Target runtime: about 2 minutes 30 seconds to 2 minutes 55 seconds when both Kor
 
 **EN**: We start with a mock login that imagines a Toss App-in-App entry point. The onboarding explains privacy, housing readiness, and trust through clear reasons.
 
-## 0:45 to 1:20, 3-step trust pass wizard
+## 0:45 to 1:20, 4-step trust pass wizard
 
-**KO**: 이제 3-step wizard에서 패스를 만듭니다. DIDSet으로 공개 DID를 확인하고, 비자와 월세 평판 credential을 확인한 뒤, 예약금 보호 기록과 리포트 배지를 확인합니다. seed, private key, 여권 원문은 저장하지 않습니다.
+**KO**: 이제 4-step wizard에서 패스를 만듭니다. DIDSet으로 공개 DID를 확인하고, 비자와 고용 또는 재학 서류를 업로드 검증한 뒤, credential과 예약금 보호 기록을 확인합니다. 문서확인번호와 QR 원문, seed, private key는 저장하지 않습니다.
 
-**EN**: In the 3-step wizard, we confirm the DIDSet, review visa and rent-reputation credentials, then confirm reservation protection and report badges. The MVP stores no seed, private key, raw passport, or raw phone number.
+**EN**: In the 4-step wizard, we confirm the DIDSet, verify uploaded visa and employment or school evidence, then confirm credentials and reservation protection. The MVP stores no raw verification code, QR URL, seed, or private key.
 
 ## 1:20 to 1:55, dashboard and Toss benefit mock
 
@@ -43,5 +43,6 @@ Target runtime: about 2 minutes 30 seconds to 2 minutes 55 seconds when both Kor
 ## Operator notes
 
 - Primary path: `/tenant/` mock login, onboarding, trust pass wizard, dashboard, App-in-App mock unlock, share link, `/verify/report_*`, landlord confirmation.
+- In the document step, the default demo fixture is enough. It shows authenticity-ready status and retention copy without requiring local files.
 - Backup path: choose the expired visa fallback fixture in the wizard and show the renewal guide.
-- Recording scope: local app only, no live identity provider, no paid service, no real fund movement.
+- Recording scope: local app only, no live identity provider, no paid service, no real fund movement, no real government document lookup.

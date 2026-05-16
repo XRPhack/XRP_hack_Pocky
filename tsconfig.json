@@ -17,5 +17,5 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "server", "api", "playwright.config.ts", "tests/e2e"]
+  "include": ["src", "server/server.ts", "server/server.test.ts", "api", "playwright.config.ts", "tests/e2e"]
 }

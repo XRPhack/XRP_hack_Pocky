@@ -1,68 +1,70 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockState = vi.hoisted(() => ({
-  instances: [] as Array<{
-    url: string;
-    connected: boolean;
-    connect: ReturnType<typeof vi.fn>;
-    disconnect: ReturnType<typeof vi.fn>;
-    isConnected: ReturnType<typeof vi.fn>;
-    fundWallet: ReturnType<typeof vi.fn>;
-    submitAndWait: ReturnType<typeof vi.fn>;
-  }>
-}));
+type MockClientInstance = {
+  url: string;
+  connected: boolean;
+  connect: ReturnType<typeof vi.fn>;
+  disconnect: ReturnType<typeof vi.fn>;
+  isConnected: ReturnType<typeof vi.fn>;
+  fundWallet: ReturnType<typeof vi.fn>;
+  submitAndWait: ReturnType<typeof vi.fn>;
+};
 
-vi.mock('xrpl', () => {
-  class MockClient {
-    url: string;
-    connected = false;
-    connect = vi.fn(async () => {
-      this.connected = true;
-    });
-    disconnect = vi.fn(async () => {
-      this.connected = false;
-    });
-    isConnected = vi.fn(() => this.connected);
-    fundWallet = vi.fn(async (wallet?: unknown, options?: unknown) => ({
-      wallet: wallet ?? { classicAddress: 'rTest' },
-      balance: 10,
-      options
-    }));
-    submitAndWait = vi.fn(async (tx: unknown, options?: unknown) => ({
-      tx,
-      options
-    }));
+const mockState = {
+  instances: [] as MockClientInstance[]
+};
 
-    constructor(url: string) {
-      this.url = url;
-      mockState.instances.push(this);
+async function loadXrplClientModule() {
+  vi.doMock('xrpl', () => {
+    class MockClient {
+      url: string;
+      connected = false;
+      connect = vi.fn(async () => {
+        this.connected = true;
+      });
+      disconnect = vi.fn(async () => {
+        this.connected = false;
+      });
+      isConnected = vi.fn(() => this.connected);
+      fundWallet = vi.fn(async (wallet?: unknown, options?: unknown) => ({
+        wallet: wallet ?? { classicAddress: 'rTest' },
+        balance: 10,
+        options
+      }));
+      submitAndWait = vi.fn(async (tx: unknown, options?: unknown) => ({
+        tx,
+        options
+      }));
+
+      constructor(url: string) {
+        this.url = url;
+        mockState.instances.push(this);
+      }
     }
-  }
 
-  return { Client: MockClient };
-});
-
-import {
-  XRPL_TESTNET_WS,
-  disconnectClient,
-  fundTestWallet,
-  getClient,
-  submitAndWait
-} from './xrplClient';
-
-describe('xrplClient', () => {
-  beforeEach(async () => {
-    mockState.instances.length = 0;
-    await disconnectClient();
+    return { Client: MockClient };
   });
 
-  it('exports the XRPL Testnet websocket endpoint and avoids mainnet strings', () => {
+  return import('./xrplClient');
+}
+
+describe('xrplClient', () => {
+  beforeEach(() => {
+    mockState.instances.length = 0;
+    vi.resetModules();
+    vi.clearAllMocks();
+  });
+
+  it('exports the XRPL Testnet websocket endpoint and avoids mainnet strings', async () => {
+    const { XRPL_TESTNET_WS } = await loadXrplClientModule();
+
     expect(XRPL_TESTNET_WS).toBe('wss://s.altnet.rippletest.net:51233');
     expect(XRPL_TESTNET_WS).not.toContain('mainnet');
     expect(XRPL_TESTNET_WS).not.toContain('ripplex.io');
   });
 
   it('creates a reusable client that can be disconnected', async () => {
+    const { XRPL_TESTNET_WS, disconnectClient, getClient } = await loadXrplClientModule();
     const client = await getClient();
     const reusedClient = await getClient();
 
@@ -78,6 +80,7 @@ describe('xrplClient', () => {
   });
 
   it('funds a test wallet through the cached client', async () => {
+    const { fundTestWallet } = await loadXrplClientModule();
     const result = await fundTestWallet({ classicAddress: 'rTEST' } as never, {
       usageContext: 'nomokdon-test'
     });
@@ -91,6 +94,7 @@ describe('xrplClient', () => {
   });
 
   it('submits a transaction with autofill and wallet signing enabled', async () => {
+    const { submitAndWait } = await loadXrplClientModule();
     const wallet = { classicAddress: 'rWALLET' } as never;
     const tx = { TransactionType: 'Payment' } as never;
 

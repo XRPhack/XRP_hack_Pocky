@@ -17,11 +17,15 @@
 
 임차인은 mock Toss 로그인으로 시작합니다. 앱은 여권번호, 전화번호, seed, private key를 저장하지 않는다는 안내를 먼저 보여줍니다.
 
-그다음 3단계 wizard에서 공개 DID, 비자 credential, 월세 평판 credential, 예약금 보호 evidence를 확인합니다. 정상 fixture에서는 Trust Grade와 여섯 개 배지가 만들어지고, edge fixture에서는 만료된 비자 때문에 pass 생성이 막힙니다.
+그다음 4단계 wizard에서 공개 DID, 문서 업로드 검증, 비자/고용 credential, 예약금 보호 evidence를 확인합니다. 정상 fixture에서는 Trust Grade와 여섯 개 배지가 만들어지고, edge fixture에서는 만료된 비자 때문에 pass 생성이 막힙니다.
 
 대시보드에서는 공유 링크와 QR을 제공합니다. 임대인은 `/verify/report_*`에서 리포트를 확인하고, 확인 버튼을 눌러 검증 상태를 기록합니다.
 
 Issuer console은 발표자가 evidence 상태를 보여주는 운영자 화면입니다. dry run이 기본이며, live submit은 별도 환경이 준비된 경우에만 사용합니다.
+
+문서 업로드 기반 비자/고용 검증은 `POST /api/verification-documents`에서 처리합니다. API 요청/응답, `reviewReasons`, `retention`, `authenticity`, 감사 로그 계약은 `docs/document-verification-api.md`를 기준으로 설명합니다.
+
+스캔 PDF나 이미지처럼 자동 파싱이 어려운 문서는 현재 실제 OCR을 수행하지 않고 수동검토 ticket만 생성합니다. 이 확장 지점은 `src/domain/adapters/document-review.ts`의 `DocumentReviewQueueAdapter`로 분리되어 있어, 추후 OCR 또는 운영자 승인 큐를 연결할 때 원문을 API 응답에 노출하지 않는 방식으로 교체할 수 있습니다.
 
 ## 3. XRPL 범위
 
@@ -61,6 +65,7 @@ src/domain/xrplService.ts
 server/server.ts
 scripts/demo-fixtures.json
 docs/demo-script.md
+docs/document-verification-api.md
 docs/demo-video.mp4
 ```
 
@@ -74,8 +79,9 @@ docs/demo-video.mp4
 2. 만료된 비자는 pass 생성을 막습니다.
 3. 검증 배지는 입력 evidence에서 계산됩니다.
 4. 공개 verify page는 임대인용 리포트 상태를 따로 보여줍니다.
-5. Issuer console은 evidence 로그와 fixture 상태를 따로 보여줍니다.
-6. Playwright e2e와 unit test가 tenant, verify, issuer 흐름을 검증합니다.
+5. 문서 업로드 검증은 진위확인 상태, 수동검토 사유, TTL, 감사 로그를 분리해 보여줍니다.
+6. Issuer console은 evidence 로그와 fixture 상태를 따로 보여줍니다.
+7. Playwright e2e와 unit test가 tenant, verify, issuer 흐름을 검증합니다.
 
 ## 7. 실행 방법
 

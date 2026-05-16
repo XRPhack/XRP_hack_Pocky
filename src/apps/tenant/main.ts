@@ -1,4 +1,5 @@
 import '../../styles.css';
+import { employmentEdgeCase, employmentHappyCase } from '../../domain/adapters/employment.fixture';
 import { visaEdgeCase, visaHappyCase, visaMockAdapter } from '../../domain/adapters/visa.fixture';
 import { getLocalePreference, getSession, setLocalePreference, setSession, type TossOAuthMockSessionInput } from '../../shared/auth/session';
 import { t, type Locale } from '../../shared/i18n';
@@ -18,6 +19,11 @@ import {
   type DashboardTrustGrade,
   type LoginStatus,
   type TenantWizardFixtureId,
+  type WizardDocumentAuthenticity,
+  type WizardDocumentFileFeedback,
+  type WizardDocumentRetention,
+  type WizardDocumentReviewReason,
+  type WizardDocumentVerificationSummary,
   type WizardStepStatus
 } from './screens';
 
@@ -38,7 +44,16 @@ type TenantState = {
   trustPassPlaceholderVisible: boolean;
   selectedFixtureId: TenantWizardFixtureId;
   wizardStepIndex: number;
-  wizardSteps: [WizardStepState, WizardStepState, WizardStepState];
+  wizardSteps: [WizardStepState, WizardStepState, WizardStepState, WizardStepState];
+  documentFiles: {
+    visa?: File;
+    employment?: File;
+  };
+  documentFileFeedback: {
+    visa?: WizardDocumentFileFeedback;
+    employment?: WizardDocumentFileFeedback;
+  };
+  documentVerification?: WizardDocumentVerificationSummary;
   reportBadges: string[];
   dashboardBadges?: [DashboardBadge, DashboardBadge, DashboardBadge, DashboardBadge, DashboardBadge, DashboardBadge];
   reportId?: string;
@@ -65,8 +80,20 @@ const state: TenantState = {
   selectedFixtureId: 'happy',
   wizardStepIndex: 0,
   wizardSteps: createWizardStepStates(),
+  documentFiles: {},
+  documentFileFeedback: {},
   reportBadges: []
 };
+
+const MAX_DOCUMENT_FILE_BYTES = 5 * 1024 * 1024;
+const supportedDocumentMimeTypes = new Set([
+  'application/json',
+  'text/plain',
+  'application/pdf',
+  'image/png',
+  'image/jpeg'
+]);
+const supportedDocumentExtensions = ['.json', '.txt', '.pdf', '.png', '.jpg', '.jpeg'] as const;
 
 class WizardStepError extends Error {
   constructor(
@@ -78,8 +105,9 @@ class WizardStepError extends Error {
   }
 }
 
-function createWizardStepStates(): [WizardStepState, WizardStepState, WizardStepState] {
+function createWizardStepStates(): [WizardStepState, WizardStepState, WizardStepState, WizardStepState] {
   return [
+    { status: 'idle', progress: 0 },
     { status: 'idle', progress: 0 },
     { status: 'idle', progress: 0 },
     { status: 'idle', progress: 0 }
@@ -122,6 +150,22 @@ function isDashboardBadgeStatus(value: unknown): value is DashboardBadgeStatus {
 
 function isDashboardTrustGrade(value: unknown): value is DashboardTrustGrade {
   return value === 'A' || value === 'B' || value === 'C' || value === 'D';
+}
+
+function isDocumentAuthenticityStatus(value: unknown): value is WizardDocumentAuthenticity['status'] {
+  return value === 'not-checked' || value === 'ready' || value === 'failed';
+}
+
+function isDocumentAuthenticityMethod(value: unknown): value is WizardDocumentAuthenticity['method'] {
+  return value === 'document-code' || value === 'qr-url' || value === 'missing';
+}
+
+function isDocumentReviewKind(value: unknown): value is WizardDocumentReviewReason['kind'] {
+  return value === 'visa' || value === 'employment';
+}
+
+function isDocumentReviewCode(value: unknown): value is WizardDocumentReviewReason['code'] {
+  return value === 'parse-failed' || value === 'verification-failed' || value === 'authenticity-missing';
 }
 
 function clearDashboardReport(): void {
@@ -174,6 +218,9 @@ function showOnboarding(): void {
   state.trustPassPlaceholderVisible = false;
   state.wizardStepIndex = 0;
   state.wizardSteps = createWizardStepStates();
+  state.documentFiles = {};
+  state.documentFileFeedback = {};
+  state.documentVerification = undefined;
   clearDashboardReport();
   render();
 }
@@ -183,6 +230,9 @@ function showWizard(): void {
   state.trustPassPlaceholderVisible = false;
   state.wizardStepIndex = 0;
   state.wizardSteps = createWizardStepStates();
+  state.documentFiles = {};
+  state.documentFileFeedback = {};
+  state.documentVerification = undefined;
   clearDashboardReport();
   render();
 }
@@ -199,6 +249,117 @@ function selectWizardFixture(fixtureId: TenantWizardFixtureId): void {
   state.selectedFixtureId = fixtureId;
   clearDashboardReport();
   render();
+}
+
+function setDocumentFile(kind: 'visa' | 'employment', file: File | null): void {
+  if (state.wizardStepIndex !== 1 || state.wizardSteps[1].status === 'loading') {
+    return;
+  }
+
+  if (file) {
+    const validation = validateDocumentFile(file);
+    const nextFeedback = { ...state.documentFileFeedback };
+
+    nextFeedback[kind] = validation.feedback;
+    state.documentFileFeedback = nextFeedback;
+
+    if (!validation.accepted) {
+      const nextFiles = { ...state.documentFiles };
+      delete nextFiles[kind];
+      state.documentFiles = nextFiles;
+      state.documentVerification = undefined;
+      render();
+      return;
+    }
+
+    state.documentFiles = { ...state.documentFiles, [kind]: file };
+    state.documentVerification = undefined;
+  } else {
+    const nextFiles = { ...state.documentFiles };
+    const nextFeedback = { ...state.documentFileFeedback };
+    delete nextFiles[kind];
+    delete nextFeedback[kind];
+    state.documentFiles = nextFiles;
+    state.documentFileFeedback = nextFeedback;
+    state.documentVerification = undefined;
+  }
+
+  render();
+}
+
+function getDocumentExtension(fileName: string): string {
+  const lower = fileName.toLowerCase();
+  const dotIndex = lower.lastIndexOf('.');
+
+  return dotIndex >= 0 ? lower.slice(dotIndex) : '';
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024 * 1024) {
+    return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  }
+
+  return `${Math.round((bytes / (1024 * 1024)) * 10) / 10} MB`;
+}
+
+function validateDocumentFile(file: File): { accepted: boolean; feedback: WizardDocumentFileFeedback } {
+  const extension = getDocumentExtension(file.name);
+  const hasSupportedType = supportedDocumentMimeTypes.has(file.type);
+  const hasSupportedExtension = supportedDocumentExtensions.includes(extension as (typeof supportedDocumentExtensions)[number]);
+
+  if (file.size > MAX_DOCUMENT_FILE_BYTES) {
+    return {
+      accepted: false,
+      feedback: {
+        variant: 'error',
+        message: t('tenantWizardDocumentFileTooLarge', state.locale)
+          .replace('{maxSize}', formatFileSize(MAX_DOCUMENT_FILE_BYTES))
+          .replace('{fileSize}', formatFileSize(file.size))
+      }
+    };
+  }
+
+  if (!hasSupportedType && !hasSupportedExtension) {
+    return {
+      accepted: false,
+      feedback: {
+        variant: 'error',
+        message: t('tenantWizardDocumentFileUnsupported', state.locale)
+      }
+    };
+  }
+
+  if (file.type === 'image/png' || file.type === 'image/jpeg' || extension === '.png' || extension === '.jpg' || extension === '.jpeg') {
+    return {
+      accepted: true,
+      feedback: {
+        variant: 'warning',
+        message: t('tenantWizardDocumentFileImageWarning', state.locale)
+      }
+    };
+  }
+
+  if (file.type === 'application/pdf' || extension === '.pdf') {
+    return {
+      accepted: true,
+      feedback: {
+        variant: 'warning',
+        message: t('tenantWizardDocumentFilePdfWarning', state.locale)
+      }
+    };
+  }
+
+  return {
+    accepted: true,
+    feedback: {
+      variant: 'info',
+      message: t('tenantWizardDocumentFileReady', state.locale)
+    }
+  };
+}
+
+function removeDocumentFile(kind: 'visa' | 'employment'): void {
+  setDocumentFile(kind, null);
 }
 
 function delay(milliseconds: number): Promise<void> {
@@ -231,6 +392,211 @@ async function validateCredentialFixture(): Promise<void> {
       .replace('{expiresAt}', formatFixtureDate(visaInput.expiresAt))
       .replace('{reason}', visaResult.message ?? visaResult.data.summary)
   );
+}
+
+function encodeTextAsBase64(value: string): string {
+  const bytes = new TextEncoder().encode(value);
+  let binary = '';
+
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+
+  return btoa(binary);
+}
+
+async function fileToBase64(file: File): Promise<string> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = '';
+
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+
+  return btoa(binary);
+}
+
+function createFixtureDocument(kind: 'visa' | 'employment'): { filename: string; mimeType: 'application/json'; base64: string } {
+  const visaInput = state.selectedFixtureId === 'edge' ? visaEdgeCase : visaHappyCase;
+  const employmentInput = state.selectedFixtureId === 'edge' ? employmentEdgeCase : employmentHappyCase;
+  const payload = kind === 'visa'
+    ? {
+        documentType: 'foreign-registration-certificate',
+        subjectId: visaInput.subjectId,
+        visaType: visaInput.visaType,
+        nationality: visaInput.nationality,
+        expiresAt: visaInput.expiresAt,
+        issuer: visaInput.issuer,
+        foreignRegistrationNumberLast4: visaInput.passportNumberLast4,
+        documentVerificationCode: state.selectedFixtureId === 'edge' ? 'MOJ-2024-EDGE9934' : 'MOJ-2027-HAPPY4821'
+      }
+    : {
+        documentType: 'employment-confirmation',
+        subjectId: employmentInput.subjectId,
+        verificationChannel: employmentInput.verificationChannel === 'school' ? 'school' : 'employment-insurance',
+        organizationName: employmentInput.organizationName,
+        roleOrProgram: employmentInput.roleOrProgram,
+        acquiredAt: employmentInput.enrollmentVerified || employmentInput.employmentVerified ? '2025-03-01T00:00:00.000Z' : undefined,
+        lostAt: employmentInput.enrollmentVerified || employmentInput.employmentVerified ? undefined : '2025-12-31T00:00:00.000Z',
+        issuer: `${employmentInput.verificationChannel}-mock-registry`,
+        qrVerificationUrl: `https://verify.example.test/${employmentInput.verificationChannel}/${state.selectedFixtureId}`
+      };
+
+  return {
+    filename: `${kind}-${state.selectedFixtureId}.json`,
+    mimeType: 'application/json',
+    base64: encodeTextAsBase64(JSON.stringify(payload))
+  };
+}
+
+async function createUploadedDocumentPayload(kind: 'visa' | 'employment'): Promise<{ filename: string; mimeType: string; base64: string }> {
+  const file = state.documentFiles[kind];
+
+  if (!file) {
+    return createFixtureDocument(kind);
+  }
+
+  return {
+    filename: file.name,
+    mimeType: file.type || 'text/plain',
+    base64: await fileToBase64(file)
+  };
+}
+
+async function uploadVerificationDocuments(): Promise<void> {
+  const session = getSession();
+  const blockingFeedback = Object.values(state.documentFileFeedback).find((feedback) => feedback.variant === 'error');
+
+  if (blockingFeedback) {
+    throw new WizardStepError(t('tenantWizardDocumentReviewTitle', state.locale), blockingFeedback.message);
+  }
+
+  const response = await fetch('/api/verification-documents', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      subjectId: session?.userId,
+      visaDocument: await createUploadedDocumentPayload('visa'),
+      employmentDocument: await createUploadedDocumentPayload('employment')
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(t('tenantWizardDocumentErrorCopy', state.locale));
+  }
+
+  const payload = await response.json() as unknown;
+  state.documentVerification = parseDocumentVerificationSummary(payload);
+
+  if (!isRecord(payload) || payload.status !== 'verified') {
+    const reviewMessage = state.documentVerification?.reviewReasons
+      .map((reason) => `${reason.title} ${reason.action}`)
+      .join(' ');
+    throw new WizardStepError(
+      t('tenantWizardDocumentReviewTitle', state.locale),
+      reviewMessage || t('tenantWizardDocumentReviewCopy', state.locale)
+    );
+  }
+}
+
+function parseDocumentVerificationSummary(payload: unknown): WizardDocumentVerificationSummary | undefined {
+  if (!isRecord(payload)) {
+    return undefined;
+  }
+
+  const verificationPayload = payload;
+
+  function parseResult(kind: 'visa' | 'employment') {
+    const result = verificationPayload[kind];
+
+    if (!isRecord(result) || !isRecord(result.data)) {
+      return undefined;
+    }
+
+    const source = getString(result.source);
+    const evidenceHash = getString(result.evidenceHash);
+    const summary = getString(result.data.summary);
+    const authenticity = parseDocumentAuthenticity(result.data.authenticity);
+
+    if (!source || !evidenceHash || !summary) {
+      return undefined;
+    }
+
+    return {
+      success: result.success === true,
+      source,
+      evidenceHash,
+      summary,
+      authenticity
+    };
+  }
+
+  return {
+    visa: parseResult('visa'),
+    employment: parseResult('employment'),
+    reviewReasons: parseDocumentReviewReasons(verificationPayload.reviewReasons),
+    retention: parseDocumentRetention(verificationPayload.retention)
+  };
+}
+
+function parseDocumentRetention(value: unknown): WizardDocumentRetention | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const expiresAt = getString(value.expiresAt);
+  const ttlMs = value.ttlMs;
+  const replacedPrevious = value.replacedPrevious;
+
+  if (!expiresAt || typeof ttlMs !== 'number' || typeof replacedPrevious !== 'boolean') {
+    return undefined;
+  }
+
+  return { expiresAt, ttlMs, replacedPrevious };
+}
+
+function parseDocumentReviewReasons(value: unknown): WizardDocumentReviewReason[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((reason) => {
+      if (!isRecord(reason)) {
+        return undefined;
+      }
+
+      const kind = reason.kind;
+      const code = reason.code;
+      const title = getString(reason.title);
+      const message = getString(reason.message);
+      const action = getString(reason.action);
+
+      if (!isDocumentReviewKind(kind) || !isDocumentReviewCode(code) || !title || !message || !action) {
+        return undefined;
+      }
+
+      return { kind, code, title, message, action };
+    })
+    .filter((reason): reason is WizardDocumentReviewReason => Boolean(reason));
+}
+
+function parseDocumentAuthenticity(value: unknown): WizardDocumentAuthenticity | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const status = value.status;
+  const method = value.method;
+  const summary = getString(value.summary);
+
+  if (!isDocumentAuthenticityStatus(status) || !isDocumentAuthenticityMethod(method) || !summary) {
+    return undefined;
+  }
+
+  return { status, method, summary };
 }
 
 function parseDryRunReport(payload: unknown): {
@@ -374,7 +740,7 @@ async function runWizardStep(stepIndex: number): Promise<void> {
     step.progress = 72;
     render();
 
-    if (stepIndex === 2) {
+    if (stepIndex === 3) {
       const report = await fetchDryRunReport();
       state.reportId = report.reportId;
       state.trustGrade = report.trustGrade;
@@ -382,6 +748,9 @@ async function runWizardStep(stepIndex: number): Promise<void> {
       state.reportBadges = report.badges.map((badge) => badge.label);
       state.shareFeedbackKey = undefined;
     } else if (stepIndex === 1) {
+      await validateCredentialFixture();
+      await uploadVerificationDocuments();
+    } else if (stepIndex === 2) {
       await validateCredentialFixture();
     } else {
       await delay(240);
@@ -392,7 +761,7 @@ async function runWizardStep(stepIndex: number): Promise<void> {
     step.errorTitle = undefined;
     step.errorMessage = undefined;
     state.wizardStepIndex = Math.min(stepIndex + 1, state.wizardSteps.length - 1);
-    if (stepIndex === 2 && state.wizardSteps.every((wizardStep) => wizardStep.status === 'success')) {
+    if (stepIndex === 3 && state.wizardSteps.every((wizardStep) => wizardStep.status === 'success')) {
       state.stage = 'dashboard';
     }
     render();
@@ -548,8 +917,16 @@ function render(): void {
         reportBadges: state.reportBadges,
         selectedFixtureId: state.selectedFixtureId,
         isFixtureLocked: isFixtureLocked(),
+        selectedDocumentNames: {
+          visa: state.documentFiles.visa?.name,
+          employment: state.documentFiles.employment?.name
+        },
+        documentFileFeedback: state.documentFileFeedback,
+        documentVerification: state.documentVerification,
         localeToggle: createHeaderActions(),
         onFixtureChange: selectWizardFixture,
+        onDocumentChange: setDocumentFile,
+        onDocumentRemove: removeDocumentFile,
         onRunStep: (stepIndex) => {
           void runWizardStep(stepIndex);
         }

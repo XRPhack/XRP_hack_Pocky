@@ -4,7 +4,7 @@ import { Badge, Card, ErrorState, LoadingOverlay } from '../../../shared/ui';
 import { appendChildren, createTextElement, cx, type UiChild } from '../../../shared/ui/dom';
 
 export type IssuerLogsLoadStatus = 'idle' | 'loading' | 'ready' | 'error';
-export type IssuerLogEntryStatus = 'created' | 'dry-run' | 'submitted' | 'confirmed' | 'validated' | 'failed' | 'error';
+export type IssuerLogEntryStatus = 'created' | 'dry-run' | 'submitted' | 'confirmed' | 'validated' | 'failed' | 'error' | 'expired';
 export type IssuerShellTab = 'logs' | 'simulator' | 'stats';
 
 export type IssuerLogEvent = {
@@ -75,7 +75,8 @@ const allowedStatuses: readonly IssuerLogEntryStatus[] = [
   'confirmed',
   'validated',
   'failed',
-  'error'
+  'error',
+  'expired'
 ];
 
 const safeDetailLabels: Record<string, string> = {
@@ -94,7 +95,14 @@ const safeDetailLabels: Record<string, string> = {
   step: 'issuerLogDetailStep',
   transactionType: 'issuerLogDetailTransactionType',
   reportId: 'issuerLogContextReport',
-  tenantWalletAddress: 'issuerLogDetailTenantWallet'
+  tenantWalletAddress: 'issuerLogDetailTenantWallet',
+  verificationId: 'issuerLogDetailVerificationId',
+  documentKinds: 'issuerLogDetailDocumentKinds',
+  reviewReasonCount: 'issuerLogDetailReviewReasonCount',
+  reviewReasons: 'issuerLogDetailReviewReasons',
+  retentionTtlMinutes: 'issuerLogDetailRetentionTtlMinutes',
+  replacedPrevious: 'issuerLogDetailReplacedPrevious',
+  expiresAt: 'issuerLogDetailExpiresAt'
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -112,6 +120,10 @@ function isSafeDisplayValue(value: string): boolean {
 function getSafeString(value: unknown): string | undefined {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return String(value);
+  }
+
+  if (typeof value === 'boolean') {
+    return value ? 'true' : 'false';
   }
 
   const safeValue = getString(value);
@@ -189,7 +201,7 @@ function statusVariant(status: IssuerLogEntryStatus): 'neutral' | 'success' | 'w
     return 'error';
   }
 
-  if (status === 'submitted') {
+  if (status === 'submitted' || status === 'expired') {
     return 'info';
   }
 
@@ -204,7 +216,8 @@ function statusLabel(status: IssuerLogEntryStatus, locale: Locale): string {
     confirmed: 'issuerLogStatusConfirmed',
     validated: 'issuerLogStatusValidated',
     failed: 'issuerLogStatusFailed',
-    error: 'issuerLogStatusError'
+    error: 'issuerLogStatusError',
+    expired: 'issuerLogStatusExpired'
   };
 
   return t(keyByStatus[status], locale);
@@ -217,6 +230,10 @@ function eventTypeLabel(type: string, locale: Locale): string {
 
   if (type === 'issuer.sign-and-submit') {
     return t('issuerLogEventIssuerSignAndSubmit', locale);
+  }
+
+  if (type === 'document.verification') {
+    return t('issuerLogEventDocumentVerification', locale);
   }
 
   if (type === 'issuer.simulator') {

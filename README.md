@@ -21,11 +21,15 @@ npm run dev
 
 ## MVP 데모 플로우
 
-1. **임차인 모바일 앱**: mock Toss 로그인, 온보딩, 3단계 trust pass wizard, 대시보드, 공유 QR을 제공합니다.
+1. **임차인 모바일 앱**: mock Toss 로그인, 온보딩, 4단계 trust pass wizard, 대시보드, 공유 QR을 제공합니다.
 2. **임대인 verify page**: 로그인 없이 공개 리포트 ID, Trust Grade, 여섯 개 검증 배지, XRPL Testnet 링크를 확인합니다.
 3. **Issuer console**: happy/edge fixture로 DID, Credential, Payment, Escrow evidence를 dry run 또는 live submit 형태로 기록합니다.
 4. **Toss mock unlock**: 실제 Toss API 없이, 신뢰 패스가 금융생활 혜택 설명으로 이어지는 화면만 보여줍니다.
 5. **데모 자료**: `docs/demo-script.md`, `docs/demo-video.mp4`, Playwright evidence, `scripts/demo-fixtures.json`을 사용합니다.
+
+문서 업로드 검증 API 계약은 [`docs/document-verification-api.md`](docs/document-verification-api.md)에 정리되어 있습니다. 지원 파일 형식, `reviewReasons`, `retention`, `authenticity`, 감사 로그 정책을 이 문서 기준으로 확인합니다.
+보안/개인정보 경계와 테스트 범위는 [`docs/security-privacy-checklist.md`](docs/security-privacy-checklist.md)에 정리되어 있습니다.
+최종 시연 전 확인 순서는 [`docs/final-demo-checklist.md`](docs/final-demo-checklist.md)를 따릅니다.
 
 ## 안전 경계
 

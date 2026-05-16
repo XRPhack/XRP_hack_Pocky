@@ -65,6 +65,14 @@ function postJson(path: string, body: ApiJson, headers?: HeadersInit) {
   });
 }
 
+function asBase64Json(value: unknown): string {
+  return Buffer.from(JSON.stringify(value), 'utf8').toString('base64');
+}
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
 function expectNoSecrets(text: string, secrets: string[]): void {
   for (const secret of secrets) {
     expect(text).not.toContain(secret);
@@ -100,6 +108,7 @@ describe('mini Node API', () => {
       mode: 'dry-run'
     });
     expect(json.routes).toContain('POST /api/auth/toss-mock');
+    expect(json.routes).toContain('POST /api/verification-documents');
     expect(json.routes).toContain('POST /api/issuer/login');
     expect(json.routes).toContain('GET /api/issuer/session');
     expect(json.routes).toContain('POST /api/issuer/simulator');
@@ -288,6 +297,15 @@ describe('mini Node API', () => {
 
     expect(response.status).toBe(200);
     expect(json.ok).toBe(true);
+    expect(json.summary).toMatchObject({
+      totalEvents: 1,
+      documentVerification: {
+        total: 0,
+        validated: 0,
+        reviewNeeded: 0,
+        expired: 0
+      }
+    });
     expect(json.events).toEqual([
       expect.objectContaining({
         id: expect.stringMatching(/^log_/),
@@ -394,6 +412,13 @@ describe('mini Node API', () => {
     });
     expect(sign.json.reportId).toMatch(/^report_/);
     expect(sign.text).toContain('CredentialCreate');
+    expect(sign.json.drafts).toMatchObject({
+      credentialCreate: expect.objectContaining({ TransactionType: 'CredentialCreate' }),
+      credentialAccept: expect.objectContaining({ TransactionType: 'CredentialAccept' }),
+      employmentCredentialCreate: expect.objectContaining({ TransactionType: 'CredentialCreate' }),
+      employmentCredentialAccept: expect.objectContaining({ TransactionType: 'CredentialAccept' })
+    });
+    expect(JSON.stringify(sign.json.drafts)).toContain('6E6F6D6F6B646F6E2D656D706C6F796D656E74');
     expect(sign.text).not.toContain('tx_blob');
     expectNoSecrets(sign.text, [issuerSeed, leakedRequestSeed, leakedRequestSecret, leakedPrivateKey, leakedTxBlob]);
 
@@ -412,6 +437,480 @@ describe('mini Node API', () => {
     expect(logs.response.status).toBe(200);
     expect(logs.text).toContain('issuer.sign-and-submit');
     expectNoSecrets(logs.text, [issuerSeed, leakedRequestSeed, leakedRequestSecret, leakedPrivateKey, leakedTxBlob]);
+  });
+
+  it('uses uploaded visa and employment document verification for the generated report', async () => {
+    const tenantWalletAddress = Wallet.generate().classicAddress;
+    const rawForeignRegistrationNumber = '900101-5123456';
+    const organizationName = 'Busan Technical College';
+    const visaDocumentVerificationCode = 'MOJ-2027-API';
+    const employmentQrVerificationUrl = 'https://verify.example.test/employment/abc';
+    const auth = await postJson('/api/auth/toss-mock', {
+      userId: 'user-doc-upload',
+      name: 'Document Tenant',
+      phone: '+82-10-5555-1212',
+      tenantWalletAddress
+    });
+    const sessionId = String(auth.json.sessionId);
+    const upload = await postJson(
+      '/api/verification-documents',
+      {
+        sessionId,
+        visaDocument: {
+          filename: 'foreign-registration.json',
+          mimeType: 'application/json',
+          base64: asBase64Json({
+            documentType: 'foreign-registration-certificate',
+            visaType: 'E-9',
+            nationality: 'Kyrgyzstan',
+            expiresAt: '2027-11-30T00:00:00.000Z',
+            issuer: 'Ministry of Justice Mock',
+            foreignRegistrationNumber: rawForeignRegistrationNumber,
+            documentVerificationCode: visaDocumentVerificationCode
+          })
+        },
+        employmentDocument: {
+          filename: 'employment.json',
+          mimeType: 'application/json',
+          base64: asBase64Json({
+            verificationChannel: 'school',
+            organizationName,
+            roleOrProgram: 'International Welding Program',
+            acquiredAt: '2025-03-01T00:00:00.000Z',
+            issuer: 'School Mock Registry',
+            qrVerificationUrl: employmentQrVerificationUrl
+          })
+        }
+      },
+      { 'x-session-id': sessionId }
+    );
+
+    expect(upload.response.status).toBe(201);
+    expect(upload.json).toMatchObject({
+      ok: true,
+      status: 'verified',
+      visa: expect.objectContaining({ success: true }),
+      employment: expect.objectContaining({ success: true })
+    });
+    expect(upload.json).toMatchObject({
+      visa: expect.objectContaining({
+        data: expect.objectContaining({
+          authenticity: expect.objectContaining({ status: 'ready', method: 'document-code' })
+        })
+      }),
+      employment: expect.objectContaining({
+        data: expect.objectContaining({
+          authenticity: expect.objectContaining({ status: 'ready', method: 'qr-url' })
+        })
+      })
+    });
+    expectNoSecrets(upload.text, [
+      rawForeignRegistrationNumber,
+      organizationName,
+      visaDocumentVerificationCode,
+      employmentQrVerificationUrl
+    ]);
+
+    const sign = await postJson(
+      '/api/sign-and-submit',
+      {
+        sessionId,
+        dryRun: true,
+        credentialType: 'nomokdon-visa'
+      },
+      { 'x-session-id': sessionId }
+    );
+
+    expect(sign.response.status).toBe(200);
+    expect(sign.json.report).toMatchObject({
+      authenticityChecks: expect.arrayContaining([
+        expect.objectContaining({ id: 'visa-document', status: 'ready', method: 'document-code' }),
+        expect.objectContaining({ id: 'employment-document', status: 'ready', method: 'qr-url' })
+      ]),
+      badges: expect.arrayContaining([
+        expect.objectContaining({ id: 'visa-valid', status: 'pass' }),
+        expect.objectContaining({ id: 'employment-confirmed', status: 'pass' })
+      ])
+    });
+    expect(sign.json.documentVerification).toMatchObject({
+      visa: expect.objectContaining({ success: true }),
+      employment: expect.objectContaining({ success: true })
+    });
+    expect(sign.text).toContain('2027-11-30T00:00:00.000Z');
+    expectNoSecrets(sign.text, [
+      rawForeignRegistrationNumber,
+      organizationName,
+      visaDocumentVerificationCode,
+      employmentQrVerificationUrl
+    ]);
+
+    const did = await apiFetch(`/api/did/${encodeURIComponent(tenantWalletAddress)}`);
+
+    expect(did.response.status).toBe(200);
+    expect(did.json.didDocument).toMatchObject({
+      id: `did:xrpl:testnet:${tenantWalletAddress}`,
+      controller: tenantWalletAddress,
+      proofPurpose: 'nomokdon-housing-trust-pass'
+    });
+    expect(did.json.didDocument).toHaveProperty('service');
+    expect(did.text).toContain('/api/vc/vc_');
+    expect(did.text).toContain(`/api/report/${String(sign.json.reportId)}`);
+    expectNoSecrets(did.text, [
+      rawForeignRegistrationNumber,
+      organizationName,
+      visaDocumentVerificationCode,
+      employmentQrVerificationUrl
+    ]);
+
+    const credentialId = `vc_${String(sign.json.reportId)}`;
+    const vc = await apiFetch(`/api/vc/${encodeURIComponent(credentialId)}`);
+
+    expect(vc.response.status).toBe(200);
+    expect(vc.json.credential).toMatchObject({
+      id: credentialId,
+      type: ['VerifiableCredential', 'nomokdon-visa'],
+      credentialSubject: {
+        id: `did:xrpl:testnet:${tenantWalletAddress}`,
+        walletAddress: tenantWalletAddress,
+        reportId: sign.json.reportId,
+        visa: expect.objectContaining({
+          verified: true,
+          visaType: 'E-9',
+          nationality: 'Kyrgyzstan',
+          expiresAt: '2027-11-30T00:00:00.000Z',
+          authenticity: expect.objectContaining({
+            status: 'ready',
+            method: 'document-code'
+          })
+        }),
+        employment: expect.objectContaining({
+          verified: true,
+          channel: 'school',
+          authenticity: expect.objectContaining({
+            status: 'ready',
+            method: 'qr-url'
+          })
+        })
+      }
+    });
+    const credential = vc.json.credential as { evidence: unknown[] };
+    expect(credential.evidence).toHaveLength(2);
+    expectNoSecrets(vc.text, [
+      rawForeignRegistrationNumber,
+      organizationName,
+      visaDocumentVerificationCode,
+      employmentQrVerificationUrl
+    ]);
+
+    const employmentCredentialId = `${credentialId}_employment`;
+    const employmentVc = await apiFetch(`/api/vc/${encodeURIComponent(employmentCredentialId)}`);
+
+    expect(employmentVc.response.status).toBe(200);
+    expect(employmentVc.json.credential).toMatchObject({
+      id: employmentCredentialId,
+      type: ['VerifiableCredential', 'nomokdon-employment'],
+      credentialSubject: {
+        id: `did:xrpl:testnet:${tenantWalletAddress}`,
+        employment: expect.objectContaining({
+          verified: true,
+          channel: 'school',
+          authenticity: expect.objectContaining({
+            status: 'ready',
+            method: 'qr-url'
+          })
+        })
+      }
+    });
+    expectNoSecrets(employmentVc.text, [
+      rawForeignRegistrationNumber,
+      organizationName,
+      visaDocumentVerificationCode,
+      employmentQrVerificationUrl
+    ]);
+
+    const logs = await apiFetch('/api/logs');
+
+    expect(logs.response.status).toBe(200);
+    expect(logs.json.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'document.verification',
+        status: 'validated',
+        details: expect.objectContaining({
+          documentKinds: 'visa,employment',
+          reviewReasonCount: 0
+        })
+      })
+    ]));
+    expectNoSecrets(logs.text, [
+      rawForeignRegistrationNumber,
+      organizationName,
+      visaDocumentVerificationCode,
+      employmentQrVerificationUrl
+    ]);
+  });
+
+  it('returns structured review reasons when uploaded documents need manual handling', async () => {
+    const auth = await postJson('/api/auth/toss-mock', {
+      userId: 'user-doc-review',
+      name: 'Manual Review Tenant',
+      phone: '+82-10-5555-3434'
+    });
+    const sessionId = String(auth.json.sessionId);
+    const upload = await postJson(
+      '/api/verification-documents',
+      {
+        sessionId,
+        visaDocument: {
+          filename: 'visa-scan.png',
+          mimeType: 'image/png',
+          base64: Buffer.from('png scan placeholder', 'utf8').toString('base64')
+        },
+        employmentDocument: {
+          filename: 'employment.txt',
+          mimeType: 'text/plain',
+          base64: Buffer.from([
+            'verificationChannel: school',
+            'organizationName: Busan Technical College',
+            'roleOrProgram: International Welding Program',
+            'acquiredAt: 2025-03-01T00:00:00.000Z'
+          ].join('\n'), 'utf8').toString('base64')
+        }
+      },
+      { 'x-session-id': sessionId }
+    );
+
+    expect(upload.response.status).toBe(201);
+    expect(upload.json).toMatchObject({
+      ok: true,
+      status: 'review-needed',
+      reviewReasons: expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'visa',
+          code: 'parse-failed',
+          manualReview: expect.objectContaining({
+            status: 'not-configured',
+            queue: 'ocr',
+            reasonCode: 'parse-failed',
+            documentHash: expect.stringMatching(/^[a-f0-9]{64}$/)
+          })
+        }),
+        expect.objectContaining({
+          kind: 'employment',
+          code: 'authenticity-missing',
+          manualReview: expect.objectContaining({
+            status: 'not-configured',
+            queue: 'manual-review',
+            reasonCode: 'authenticity-missing'
+          })
+        })
+      ]),
+      employment: expect.objectContaining({
+        success: true,
+        data: expect.objectContaining({
+          authenticity: expect.objectContaining({ status: 'not-checked', method: 'missing' })
+        })
+      })
+    });
+    expect(upload.text).toContain('Scanned images and image-only PDFs need manual review or OCR first.');
+    expectNoSecrets(upload.text, [
+      'png scan placeholder',
+      'Busan Technical College',
+      'International Welding Program'
+    ]);
+
+    const logs = await apiFetch('/api/logs');
+    expect(logs.json.summary).toMatchObject({
+      documentVerification: {
+        total: 1,
+        validated: 0,
+        reviewNeeded: 1,
+        expired: 0
+      }
+    });
+    expect(logs.json.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'document.verification',
+        status: 'failed',
+        details: expect.objectContaining({
+          action: 'document-verification-upload',
+          documentKinds: 'visa,employment',
+          reviewReasonCount: 2,
+          reviewReasons: 'parse-failed,authenticity-missing',
+          replacedPrevious: false
+        })
+      })
+    ]));
+    expectNoSecrets(logs.text, [
+      'png scan placeholder',
+      'Busan Technical College',
+      'International Welding Program'
+    ]);
+  });
+
+  it('replaces previous document verification data on re-upload', async () => {
+    const auth = await postJson('/api/auth/toss-mock', {
+      userId: 'user-doc-reupload',
+      name: 'Reupload Tenant',
+      phone: '+82-10-5555-5656'
+    });
+    const sessionId = String(auth.json.sessionId);
+    const firstUpload = await postJson(
+      '/api/verification-documents',
+      {
+        sessionId,
+        visaDocument: {
+          filename: 'expired-visa.json',
+          mimeType: 'application/json',
+          base64: asBase64Json({
+            visaType: 'E-9',
+            nationality: 'Kyrgyzstan',
+            expiresAt: '2024-01-01T00:00:00.000Z',
+            documentVerificationCode: 'MOJ-OLD-DOC'
+          })
+        }
+      },
+      { 'x-session-id': sessionId }
+    );
+
+    expect(firstUpload.response.status).toBe(201);
+    expect(firstUpload.json).toMatchObject({
+      status: 'review-needed',
+      retention: expect.objectContaining({ replacedPrevious: false }),
+      visa: expect.objectContaining({ success: false })
+    });
+
+    const secondUpload = await postJson(
+      '/api/verification-documents',
+      {
+        sessionId,
+        visaDocument: {
+          filename: 'valid-visa.json',
+          mimeType: 'application/json',
+          base64: asBase64Json({
+            visaType: 'E-9',
+            nationality: 'Kyrgyzstan',
+            expiresAt: '2027-11-30T00:00:00.000Z',
+            documentVerificationCode: 'MOJ-NEW-DOC'
+          })
+        }
+      },
+      { 'x-session-id': sessionId }
+    );
+
+    expect(secondUpload.response.status).toBe(201);
+    expect(secondUpload.json).toMatchObject({
+      status: 'verified',
+      retention: expect.objectContaining({ replacedPrevious: true }),
+      visa: expect.objectContaining({ success: true })
+    });
+    const logs = await apiFetch('/api/logs');
+    expect(logs.json.summary).toMatchObject({
+      documentVerification: {
+        total: 2,
+        validated: 1,
+        reviewNeeded: 1,
+        expired: 0
+      }
+    });
+    expect(logs.json.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'document.verification',
+        status: 'validated',
+        details: expect.objectContaining({
+          documentKinds: 'visa',
+          replacedPrevious: true,
+          reviewReasonCount: 0
+        })
+      })
+    ]));
+    expectNoSecrets(logs.text, ['MOJ-OLD-DOC', 'MOJ-NEW-DOC']);
+
+    const sign = await postJson(
+      '/api/sign-and-submit',
+      { sessionId, dryRun: true },
+      { 'x-session-id': sessionId }
+    );
+
+    expect(sign.response.status).toBe(200);
+    expect(sign.json.report).toMatchObject({
+      authenticityChecks: [
+        expect.objectContaining({ id: 'visa-document', status: 'ready', method: 'document-code' })
+      ],
+      badges: expect.arrayContaining([
+        expect.objectContaining({ id: 'visa-valid', status: 'pass' })
+      ])
+    });
+    expect(sign.text).toContain('2027-11-30T00:00:00.000Z');
+    expect(sign.text).not.toContain('MOJ-OLD-DOC');
+    expect(sign.text).not.toContain('MOJ-NEW-DOC');
+  });
+
+  it('expires uploaded document verification data before credential issuance', async () => {
+    process.env.DOCUMENT_VERIFICATION_TTL_MS = '1';
+    const auth = await postJson('/api/auth/toss-mock', {
+      userId: 'user-doc-expiry',
+      name: 'Expiry Tenant',
+      phone: '+82-10-5555-7878'
+    });
+    const sessionId = String(auth.json.sessionId);
+    const upload = await postJson(
+      '/api/verification-documents',
+      {
+        sessionId,
+        visaDocument: {
+          filename: 'valid-visa.json',
+          mimeType: 'application/json',
+          base64: asBase64Json({
+            visaType: 'E-9',
+            nationality: 'Kyrgyzstan',
+            expiresAt: '2027-11-30T00:00:00.000Z',
+            documentVerificationCode: 'MOJ-EXPIRING-DOC'
+          })
+        }
+      },
+      { 'x-session-id': sessionId }
+    );
+
+    expect(upload.response.status).toBe(201);
+    expect(upload.json).toMatchObject({
+      status: 'verified',
+      retention: expect.objectContaining({ ttlMs: 1 })
+    });
+
+    await delay(5);
+    const sign = await postJson(
+      '/api/sign-and-submit',
+      { sessionId, dryRun: true },
+      { 'x-session-id': sessionId }
+    );
+
+    expect(sign.response.status).toBe(200);
+    expect(sign.json.report).toMatchObject({
+      authenticityChecks: []
+    });
+    expect(sign.json.documentVerification).toBeUndefined();
+    expect(sign.text).not.toContain('MOJ-EXPIRING-DOC');
+
+    const logs = await apiFetch('/api/logs');
+    expect(logs.json.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'document.verification',
+        status: 'expired',
+        details: expect.objectContaining({
+          hadVisa: true,
+          hadEmployment: false
+        })
+      })
+    ]));
+    expect(logs.json.summary).toMatchObject({
+      documentVerification: {
+        total: 2,
+        validated: 1,
+        reviewNeeded: 0,
+        expired: 1
+      }
+    });
+    expectNoSecrets(logs.text, ['MOJ-EXPIRING-DOC']);
   });
 
   it('encrypts the in-memory report store and preserves report API responses when configured', async () => {

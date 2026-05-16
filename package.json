@@ -10,6 +10,7 @@
     "preview": "vite preview --host 127.0.0.1",
     "server": "node --import tsx server/server.ts",
     "test": "vitest run",
+    "test:e2e": "playwright test tests/e2e/happy.spec.ts tests/e2e/edge.spec.ts",
     "test:e2e:happy": "playwright test tests/e2e/happy.spec.ts",
     "test:e2e:edge": "playwright test tests/e2e/edge.spec.ts"
   },
@@ -17,9 +18,9 @@
     "@playwright/test": "^1.60.0",
     "@types/node": "^25.7.0",
     "tsx": "^4.21.0",
-    "typescript": "latest",
-    "vite": "latest",
-    "vitest": "latest"
+    "typescript": "5.9.3",
+    "vite": "6.4.2",
+    "vitest": "3.2.4"
   },
   "dependencies": {
     "qrcode-generator": "^2.0.4",
